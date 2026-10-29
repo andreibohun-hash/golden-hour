@@ -108,17 +108,17 @@ const CFG = {
   SOLVE_NODES: 300000,    // предел узлов полного перебора в аудите (с открытыми картами)
   JUICE_STREAK: 4,        // серия такой длины — «сочное событие» для метрики (наравне со снятым пиком и «Полным днём»)
   // --- раскладка (виртуальные юниты при ширине 400) ---
-  TILE_MAX: 58,           // предельная ширина полароида на столе
-  FIELD_COLS: 8,          // формы не шире стольких кадров: карточка ≈ 45 px на телефоне (10 в ряд давали 35 px — мелко)
+  TILE_MAX: 78,           // предельная ширина полароида на столе
+  FIELD_COLS: 6,          // формы не шире стольких кадров: карточка ≈ 60 px на телефоне (8 в ряд — 45 px, на устройстве мелко)
   TILE_GAP: 2.5,          // зазор между соседями в ряду
   SIDE: 10,               // поле от края кадра
-  POLA_RATIO: 1.16,       // высота полароида / ширина
+  POLA_RATIO: 1.13,       // высота полароида / ширина
   ROW_STEP: 0.6,          // шаг ряда в высотах полароида (перекрытие пиков)
   TILE_ROT_DEG: 4,        // разброс наклона полароидов, ±градусов
-  HORIZON_FRAC: 0.37,     // горизонт залива — доля высоты экрана
-  PANEL_H: 214,           // высота настила «Пирс» (плёнка, стопка, соседи, шкала)
-  VF_W: 98,               // ширина текущего кадра на стопке
-  THUMB_W: 60,            // ширина соседних времён, выглядывающих из-под стопки
+  HORIZON_FRAC: 0.22,     // горизонт залива — доля высоты экрана (небо — полоса сверху, остальное — поле на воде)
+  PANEL_H: 150,           // высота фотоаппарата внизу (плёнка, видоискатель, объективы-соседи, шкала, затмение)
+  VF_W: 84,               // сторона кадра в видоискателе
+  THUMB_W: 60,            // диаметр объективов с соседними временами
   // --- эффекты (мс, абсолютное время) ---
   WORLD_MS: 400,          // мир переходит в новое время
   LIFT_MS: 90,            // кадр приподнимается под пальцем перед полётом
@@ -174,70 +174,77 @@ const NIGHT_TIMES = ['dusk', 'night', 'midnight'];         // в видоиск�
 const LAYOUTS = {
   lesson: { name: 'Урок', tiles: [{ x: 1, y: 0, z: 0 }, { x: 0.5, y: 1, z: 1 }, { x: 1.5, y: 1, z: 1 }, { x: 1, y: 2, z: 2 }] },  // ромб из 4
   peak1: { name: 'Пик', peaks: 1 },                     // 10 кадров, открыто 4
-  peak2: { name: 'Две вершины', peaks: 2 },             // 19
-  peak3: { name: 'Три пика (классика)', peaks: 3, simOnly: true },   // 28, открыто 10 — только для сверки сима с брейнштормом: шире поля
-  peaks3: { name: 'Три пика', layers: [{ dir: 'down', rows: [      // 24: три вершины на общем основании; открыто 7
-    '..#....#....#..',
-    '.#.#..#.#..#.#.',
-    '#.#.#.#.#.#.#.#',
-    '.#.#.#.#.#.#.#.'] }] },
-  bridge: { name: 'Мост', towers: [1.5, 5.5], height: 4 },   // 27: две опоры 1-2-3-4 вплотную, настил из 7 под ними
-  sail: { name: 'Парусник', layers: [{ dir: 'down', rows: [      // 19: косой парус, кливер, корпус; открыто 7
-    '......#........',
-    '......#.#......',
-    '....#.#.#.#....',
-    '...#..#.#.#.#..',
-    '.#.#.#.#.#.#.#.'] }] },
+  peak2: { name: 'Две вершины (классика)', peaks: 2, simOnly: true },   // 19 — шире поля
+  peak3: { name: 'Три пика (классика)', peaks: 3, simOnly: true },      // 28, открыто 10 — только для сверки сима с брейнштормом
+  // Поле — не шире 6 кадров (CFG.FIELD_COLS): на телефоне 8 и 10 в ряд — мелко (Андрей, 29.10). Формы выше, а не шире.
+  twin: { name: 'Две вершины', layers: [{ dir: 'down', rows: [    // 17: две вершины на общем основании; открыто 5
+    '..#.....#..',
+    '.#.#...#.#.',
+    '#.#.#.#.#.#',
+    '.#.#.#.#.#.'] }] },
+  pyramid: { name: 'Пирамида', layers: [{ dir: 'down', rows: [    // 21: высокая пирамида 1–6; открыто 6
+    '.....#.....',
+    '....#.#....',
+    '...#.#.#...',
+    '..#.#.#.#..',
+    '.#.#.#.#.#.',
+    '#.#.#.#.#.#'] }] },
+  bridge: { name: 'Мост', towers: [1, 4], height: 3 },   // 17: две опоры 1-2-3 вплотную, настил из 5 под ними
+  sail: { name: 'Парусник', layers: [{ dir: 'down', rows: [      // 18: косой парус, кливер, корпус; открыто 6
+    '.....#......',
+    '.....#.#....',
+    '...#.#.#.#..',
+    '..#..#.#.#.#',
+    '.#.#.#.#.#.#'] }] },
   diamond: { name: 'Ромб', layers: [                     // 25: пик над перевёрнутым пиком, сверху лежит средний ряд; открыто 5
     { dir: 'down', rows: ['....#....', '...#.#...', '..#.#.#..', '.#.#.#.#.', '#.#.#.#.#'] },
     { dir: 'up', y0: 5, rows: ['.#.#.#.#.', '..#.#.#..', '...#.#...', '....#....'] }] },
-  sun: { name: 'Солнце', layers: [{ dir: 'down', rows: [  // 27: диск и 8 свободных лучей; открыто 11
-    '........#.......',
-    '..#...........#.',
-    '......#.#.#.....',
-    '.....#.#.#.#....',
-    '.#..#.#.#.#.#..#',
-    '.....#.#.#.#....',
-    '......#.#.#.....',
-    '..#...........#.',
-    '........#.......'] }] },
-  heart: { name: 'Сердце', layers: [{ dir: 'up', rows: [  // 30: сверху лежат верхушки; открыто 7
-    '..#.#...#.#..',
-    '#.#.#.#.#.#.#',
-    '.#.#.#.#.#.#.',
-    '..#.#.#.#.#..',
-    '...#.#.#.#...',
-    '....#.#.#....',
-    '......#......'] }] },
-  lighthouse: { name: 'Маяк', layers: [{ dir: 'down', rows: [   // 28: фонарь на высокой башне, лучи свободны; открыто 12
-    '.......#.#.#.......',
-    '..#.#...#.#...#.#..',
-    '........#.#........',
-    '........#.#........',
-    '........#.#........',
-    '........#.#........',
-    '.......#.#.#.......',
-    '..#.#.#.#.#.#.#.#..'] }] },
-  crescent: { name: 'Месяц', layers: [{ dir: 'down', rows: [    // 26: серп и две звезды; открыто 9
-    '..........#.#.#....',
-    '.......#.#.#.......',
-    '.....#.#.#.........',
-    '....#.#.#......#...',
-    '....#.#.#..........',
-    '.....#.#.#.......#.',
-    '.......#.#.#.......',
-    '..........#.#.#....'] }] },
-  camera: { name: 'Фотоаппарат', layers: [                // 25: корпус кирпичом, видоискатель сзади, объектив сверху; открыто 7
-    { dir: 'down', rows: ['....#.#........'] },
-    { dir: 'down', z0: 1, y0: 1, rows: ['..#.#.#.#.#.#.#', '...#.#.#.#.#.#.', '..#.#.#.#.#.#.#'] },
-    { dir: 'down', z0: 10, y0: 1.5, rows: ['.......#.#.....', '........#......'] }] },
-  city: { name: 'Город', layers: [{ dir: 'down', rows: [  // 28: дома разной высоты за набережной; открыто 8
-    '...........#.......',
-    '.....#.....#.......',
-    '.....#...#.#...#...',
-    '...#.#...#.#.#.#...',
-    '...#.#.#.#.#.#.#...',
-    '..#.#.#.#.#.#.#.#..'] }] },
+  sun: { name: 'Солнце', layers: [{ dir: 'down', rows: [  // 22: диск и 8 свободных лучей; открыто 10
+    '.....#.....',
+    '.#.......#.',
+    '....#.#....',
+    '...#.#.#...',
+    '#.#.#.#.#.#',
+    '...#.#.#...',
+    '....#.#....',
+    '.#.......#.',
+    '.....#.....'] }] },
+  heart: { name: 'Сердце', layers: [{ dir: 'up', rows: [  // 25: сверху лежат верхушки; открыто 4
+    '.#.#...#.#.',
+    '#.#.#.#.#.#',
+    '.#.#.#.#.#.',
+    '..#.#.#.#..',
+    '...#.#.#...',
+    '....#.#....',
+    '.....#.....'] }] },
+  lighthouse: { name: 'Маяк', layers: [{ dir: 'down', rows: [   // 23: фонарь на высокой башне, лучи свободны; открыто 7
+    '...#.#.#...',
+    '#...#.#...#',
+    '....#.#....',
+    '....#.#....',
+    '....#.#....',
+    '....#.#....',
+    '...#.#.#...',
+    '.#.#.#.#.#.'] }] },
+  crescent: { name: 'Месяц', layers: [{ dir: 'down', rows: [    // 18: серп и две звезды
+    '.......#.#.',
+    '.....#.#...',
+    '...#.#.....',
+    '..#.#....#.',
+    '..#.#......',
+    '...#.#....#',
+    '.....#.#...',
+    '.......#.#.'] }] },
+  camera: { name: 'Фотоаппарат', layers: [                // 22: корпус кирпичом, видоискатель сзади, объектив сверху
+    { dir: 'down', rows: ['..#.#......'] },
+    { dir: 'down', z0: 1, y0: 1, rows: ['#.#.#.#.#.#', '.#.#.#.#.#.', '#.#.#.#.#.#'] },
+    { dir: 'down', z0: 10, y0: 1.5, rows: ['....#.#....', '.....#.....'] }] },
+  city: { name: 'Город', layers: [{ dir: 'down', rows: [  // 18: дома разной высоты за набережной; открыто 6
+    '...#.......',
+    '...#...#...',
+    '.#.#...#.#.',
+    '.#.#.#.#.#.',
+    '#.#.#.#.#.#'], y0: 2 }] },
 };
 
 // Уровни. scale — сколько времён в главе; на 10-временном режиме главы «8» идут на 10 временах, плёнка + DECK_10_EXTRA.
@@ -248,16 +255,16 @@ const LEVELS = [
   { n: 1, layout: 'lesson', scale: 8, stock: 1, tutorial: true,
     script: { tab: ['morning', 'dusk', 'night', 'sunset'], top: 'golden', stock: ['dawn'], extra: [], bonus: [] } },
   { n: 2,  layout: 'peak1',      scale: 4, stock: 4,  seed: 201 },
-  { n: 3,  layout: 'sail',       scale: 4, stock: 6,  seed: 301, intro: 'gauge' },
-  { n: 4,  layout: 'diamond',    scale: 6, stock: 8,  seed: 407 },
-  { n: 5,  layout: 'peaks3',     scale: 6, stock: 8,  seed: 502 },
-  { n: 6,  layout: 'sun',        scale: 8, stock: 11, seed: 604,  seed10: 6003,  wilds: 1, intro: 'wild' },
-  { n: 7,  layout: 'heart',      scale: 8, stock: 12, seed: 741,  seed10: 7006,  veils: { cloud: 3, where: 'open' }, intro: 'cloud' },
-  { n: 8,  layout: 'bridge',     scale: 8, stock: 13, seed: 822,  seed10: 8001,  veils: { cloud: 4 } },
-  { n: 9,  layout: 'lighthouse', scale: 8, stock: 12, seed: 1076,  seed10: 9020,  veils: { lantern: 3, where: 'open' }, intro: 'lantern' },
-  { n: 10, layout: 'crescent',   scale: 8, stock: 12, seed: 1014,  seed10: 10006, veils: { lantern: 4 } },
-  { n: 11, layout: 'camera',     scale: 8, stock: 11, seed: 1104,  seed10: 11069, veils: { cloud: 2, lantern: 2 } },
-  { n: 12, layout: 'city',       scale: 8, stock: 12, seed: 1236,  seed10: 12036, veils: { cloud: 3, lantern: 3 } },
+  { n: 3,  layout: 'sail',        scale: 4, stock: 6,  seed: 301, intro: 'gauge' },
+  { n: 4,  layout: 'diamond',     scale: 6, stock: 8,  seed: 407 },
+  { n: 5,  layout: 'pyramid',     scale: 6, stock: 7,  seed: 501 },
+  { n: 6,  layout: 'sun',         scale: 8, stock: 9, seed: 604,  seed10: 6002,  wilds: 1, intro: 'wild' },
+  { n: 7,  layout: 'heart',       scale: 8, stock: 10, seed: 1366,  seed10: 7027,  veils: { cloud: 3, where: 'open' }, intro: 'cloud' },
+  { n: 8,  layout: 'bridge',      scale: 8, stock: 8, seed: 810,  seed10: 8031,  veils: { cloud: 4 } },
+  { n: 9,  layout: 'lighthouse',  scale: 8, stock: 10, seed: 1492,  seed10: 9640,  veils: { lantern: 3, where: 'open' }, intro: 'lantern' },
+  { n: 10, layout: 'crescent',    scale: 8, stock: 8, seed: 1010,  seed10: 10058, veils: { lantern: 4 } },
+  { n: 11, layout: 'camera',      scale: 8, stock: 9, seed: 1121,  seed10: 11059, veils: { cloud: 2, lantern: 2 } },
+  { n: 12, layout: 'city',        scale: 8, stock: 8, seed: 1309,  seed10: 12034, veils: { cloud: 3, lantern: 3 } },
 ];
 
 const LAYOUT_CACHE = {};
@@ -327,54 +334,54 @@ function prim(kind, w, h){
   }
   return t.filter(c => c);
 }
-const GW = 8;   // ширина поля генератора в кадрах (как CFG.FIELD_COLS)
+const GW = 6;   // ширина поля генератора в кадрах (как CFG.FIELD_COLS)
 const place = (tiles, dx, dy, dz, mirror, width) => tiles.map(c => ({ x: (mirror ? width - 1 - c.x : c.x) + dx, y: c.y + (dy || 0), z: c.z + (dz || 0) }));
 const primW = (tiles) => Math.max(...tiles.map(c => c.x)) + 1;
 const GEN_TEMPLATES = [
   { id: 'peaks', name: 'Вершины', make(r){                  // боковые примитивы зеркально, между ними — средний
-      const kinds = ['pyr', 'tower', 'brick', 'stairs'], side = kinds[Math.floor(r() * 4)], w = 2 + Math.floor(r() * 3);
-      const h = side === 'pyr' || side === 'stairs' ? 2 + Math.floor(r() * (w - 1)) : 2 + Math.floor(r() * 4);
-      const L = prim(side, w, h), gap = 1 + Math.floor(r() * 2), out = place(L, 0, 0, 0);
+      const kinds = ['pyr', 'tower', 'brick', 'stairs'], side = kinds[Math.floor(r() * 4)], w = 2 + Math.floor(r() * 2);
+      const h = side === 'pyr' || side === 'stairs' ? 2 + Math.floor(r() * (w - 1)) : 2 + Math.floor(r() * 5);
+      const L = prim(side, w, h), gap = Math.floor(r() * 2), out = place(L, 0, 0, 0);
       const midW = GW - 2 * w - 2 * gap, mk = ['pyr', 'tower', 'brick', 'drop'][Math.floor(r() * 4)];
-      if (midW >= 1){ const mw = Math.min(midW, 1 + Math.floor(r() * 4)), M = prim(mk, mw, mk === 'pyr' || mk === 'drop' ? mw : 1 + Math.floor(r() * 5)); out.push(...place(M, w + gap + (midW - primW(M)) / 2, 0, 0)); }
+      if (midW >= 1){ const mw = Math.min(midW, 1 + Math.floor(r() * 4)), M = prim(mk, mw, mk === 'pyr' || mk === 'drop' ? mw : 1 + Math.floor(r() * 6)); out.push(...place(M, w + gap + (midW - primW(M)) / 2, 0, 0)); }
       out.push(...place(L, GW - w, 0, 0, true, w));
       return out; } },
   { id: 'castle', name: 'Замок', make(r){                    // кирпичная стена спереди, за ней башни разной высоты
-      const bw = 5 + Math.floor(r() * 3), bh = 2, x0 = (GW - bw) / 2, out = place(prim('brick', bw, bh), x0, 0, 20);
-      const n = 2 + Math.floor(r() * 2), hs = [...Array(n)].map(() => 1 + Math.floor(r() * 4));
+      const bw = 4 + Math.floor(r() * 3), bh = 2, x0 = (GW - bw) / 2, out = place(prim('brick', bw, bh), x0, 0, 20);
+      const n = 2 + Math.floor(r() * 2), hs = [...Array(n)].map(() => 1 + Math.floor(r() * 5));
       for (let c = 0; c < n; c++){
         const x = x0 + c * ((bw - 1) / 2) / Math.max(1, n - 1) * (n > 1 ? 1 : 0); const xs = Math.abs(x - (GW - 1) / 2) < 0.3 ? [(GW - 1) / 2] : [x, GW - 1 - x];
         for (const xx of xs) for (let k = 0; k < hs[c]; k++) out.push({ x: Math.round(xx * 2) / 2, y: -bh - k, z: 19 - k });
       }
       return out; } },
   { id: 'diamond', name: 'Ромб', make(r){                    // пирамида над чашей, сверху лежит средний ряд
-      const w = 4 + Math.floor(r() * 3), hu = 2 + Math.floor(r() * (w - 1)), hd = 1 + Math.floor(r() * (w - 1));
+      const w = 3 + Math.floor(r() * 3), hu = 2 + Math.floor(r() * (w - 1)), hd = 1 + Math.floor(r() * (w - 1));
       const U = prim('pyr', w, hu), D = prim('drop', w - 1, hd), x0 = (GW - w) / 2;
       return [...place(U, x0, 0, 10), ...place(D, x0 + 0.5, 1, 10 - hd - 1)]; } },
   { id: 'hourglass', name: 'Песочные часы', make(r){         // чаша над пирамидой
-      const w = 5 + Math.floor(r() * 3), hd = 2 + Math.floor(r() * 2), hu = 2 + Math.floor(r() * 2), x0 = (GW - w) / 2;
+      const w = 4 + Math.floor(r() * 3), hd = 2 + Math.floor(r() * 3), hu = 2 + Math.floor(r() * 3), x0 = (GW - w) / 2;
       return [...place(prim('drop', w, hd), x0, -hu - hd + 1, 0), ...place(prim('pyr', w, hu), x0, 0, 10)]; } },
-  { id: 'pyramid', name: 'Пирамида', make(r){ const w = 6 + Math.floor(r() * 3), h = 3 + Math.floor(r() * Math.min(4, w - 2)); return place(prim('pyr', w, h), (GW - w) / 2, 0, 0); } },
-  { id: 'wall', name: 'Стена', make(r){ const w = 6 + Math.floor(r() * 3), h = 3 + Math.floor(r() * 3); return place(prim('brick', w, h), (GW - w) / 2, 0, 0); } },
+  { id: 'pyramid', name: 'Пирамида', make(r){ const w = 4 + Math.floor(r() * 3), h = 3 + Math.floor(r() * (w - 2)); return place(prim('pyr', w, h), (GW - w) / 2, 0, 0); } },
+  { id: 'wall', name: 'Стена', make(r){ const w = 4 + Math.floor(r() * 3), h = 3 + Math.floor(r() * 4); return place(prim('brick', w, h), (GW - w) / 2, 0, 0); } },
   { id: 'crown', name: 'Корона', make(r){                    // набережная спереди, за ней башни-столбики разной высоты, симметрично
-      const base = 5 + Math.floor(r() * 4), out = place(prim('tower', base, 1), (GW - base) / 2, 0, 20);
-      const cols = Math.floor(base / 2), hs = [...Array(cols)].map(() => 1 + Math.floor(r() * 5));
+      const base = 4 + Math.floor(r() * 3), out = place(prim('tower', base, 1), (GW - base) / 2, 0, 20);
+      const cols = Math.floor(base / 2), hs = [...Array(cols)].map(() => 1 + Math.floor(r() * 6));
       for (let c = 0; c < cols; c++){
         const x = (GW - base) / 2 + 0.5 + c * 2 > (GW - 1) / 2 ? null : (GW - base) / 2 + 0.5 + c * 2; if (x === null) continue;
         for (const xx of x === (GW - 1) / 2 ? [x] : [x, GW - 1 - x]) for (let k = 0; k < hs[c]; k++) out.push({ x: xx, y: -1 - k, z: 19 - k });
       }
       return out; } },
   { id: 'gate', name: 'Ворота', make(r){                     // две опоры и перекладина над пролётом
-      const tw = 2, th = 3 + Math.floor(r() * 3), span = 1 + Math.floor(r() * 3), x0 = (GW - (2 * tw + span)) / 2;
+      const tw = 2, th = 3 + Math.floor(r() * 4), span = 1 + Math.floor(r() * 2), x0 = (GW - (2 * tw + span)) / 2;
       const T = prim('tower', tw, th), out = [...place(T, x0, 0, 1), ...place(T, x0 + tw + span, 0, 1)];
       for (let x = x0 + 0.5; x <= x0 + 2 * tw + span - 1.5 + 1e-9; x++) out.push({ x, y: -th, z: 0 });
       return out; } },
-  { id: 'bowl', name: 'Чаша', make(r){ const w = 6 + Math.floor(r() * 3), h = 3 + Math.floor(r() * 3); return place(prim('drop', w, h), (GW - w) / 2, 0, 0); } },
+  { id: 'bowl', name: 'Чаша', make(r){ const w = 4 + Math.floor(r() * 3), h = 3 + Math.floor(r() * 3); return place(prim('drop', w, h), (GW - w) / 2, 0, 0); } },
   { id: 'stairs', name: 'Ступени', make(r){                  // две лестницы навстречу: долина или гора
-      const w = 3 + Math.floor(r() * 2), h = 3 + Math.floor(r() * 2), S = prim('stairs', w, h), valley = r() < 0.5;
+      const w = 2 + Math.floor(r() * 2), h = 3 + Math.floor(r() * 3), S = prim('stairs', w, h), valley = r() < 0.5;
       return valley ? [...place(S, 0, 0, 0, true, w), ...place(S, GW - w, 0, 0)] : [...place(S, 0, 0, 0), ...place(S, GW - w, 0, 0, true, w)]; } },
 ];
-const GEN = { N: [18, 30], OPEN: [5, 9], MIN_DEPTH: 2, TRIES: 200, CAP: 0.35, STARS: 0.3, HOLES: 0.6 };   // кадров, открыто, глубина, попыток; доли второго яруса, звёзд и окон
+const GEN = { N: [14, 26], OPEN: [4, 8], MIN_DEPTH: 2, TRIES: 200, CAP: 0.35, STARS: 0.3, HOLES: 0.6 };   // кадров, открыто, глубина, попыток; доли второго яруса, звёзд и окон
 function genLayout(seed){
   const r = mulberry32(seed), t0 = Math.floor(r() * GEN_TEMPLATES.length);
   const overlaps = (a, b) => Math.abs(a.x - b.x) < 1 && Math.abs(a.y - b.y) <= 1;
@@ -410,15 +417,17 @@ function genLayout(seed){
     if (open >= GEN.OPEN[0] && open <= GEN.OPEN[1] && Math.max(...B.depth) >= GEN.MIN_DEPTH && B.width <= GW && !layoutProblems(L.name).length) return B;
     delete LAYOUTS[L.name]; delete LAYOUT_CACHE[L.name];
   }
-  return buildLayout('peaks3');                                  // запасной вариант — три пика
+  return buildLayout('pyramid');                                 // запасной вариант — пирамида
 }
 // Бесконечные уровни: форма по номеру, завесы по кругу, сложность «пилой» (окно побед случайного бота с «+3»).
 // Сид раздачи подбирают боты прямо при запуске уровня — детерминированно: тот же номер даёт тот же уровень.
 const ENDLESS = {
   BANDS: [[0.6, 0.9], [0.45, 0.75], [0.6, 0.9], [0.3, 0.6], [0.45, 0.75]],   // уровень n % 5: легко, средне, легко, трудно, средне
   VEILS: [null, { cloud: 3 }, { lantern: 3 }, { cloud: 2, lantern: 2 }, null, { cloud: 3, lantern: 3 }, { cloud: 4 }, { lantern: 4 }],
-  FILM_PER_TILE: 0.42,    // плёнка ≈ 0,42 кадра на кадр стола
+  FILM_PER_TILE: 0.46,    // плёнка ≈ 0,46 кадра на кадр стола (узкие формы в 6 колонок — столы меньше, плёнки чуть больше)
   CANDIDATES: 24, RUNS_R: 30, RUNS_G: 4, GREEDY_MIN: 0.75,     // кандидатов сида, прогонов случайного и жадного на кандидата
+  FILM_ADD: 3,            // сколько кадров плёнки можно добавить, если раздачи в окне сложности нет
+  TILES_PER_VEIL: 4,      // завес не больше чем кадров стола / 4 (узкие формы по 14–17 кадров — до 3–4 завес)
   INTRO_BAND: [0.75, 1],  // вводный уровень механики: случайный с «+3» выигрывает часто, жадный — всегда
   // механики после ручных уровней: каждая вводится на своём уровне одна, дальше уровни смешивают открытые (1–2 на уровень)
   ELEMENTS: [{ id: 'star', from: 13 }, { id: 'flash', from: 15 }, { id: 'order', from: 17 }, { id: 'rain', from: 19 }, { id: 'snow', from: 21 }],
@@ -454,25 +463,39 @@ function endlessSpec(li, mode){
   const EL = levelElements(n), has = (id) => EL.list.includes(id), band = EL.intro ? ENDLESS.INTRO_BAND : ENDLESS.BANDS[n % ENDLESS.BANDS.length];   // вводный уровень механики — лёгкий
   const gmin = EL.intro ? 1 : ENDLESS.GREEDY_MIN;
   let veils = EL.intro ? null : ENDLESS.VEILS[n % ENDLESS.VEILS.length];
-  if (has('snow')) veils = Object.assign({}, veils || {}, { snow: 3 });
+  if (has('snow')) veils = Object.assign({}, veils || {}, { snow: Math.max(1, Math.min(3, Math.floor(lay.n / 8))) });   // снег тает только в полдень: на узкой форме полдней мало — снега меньше
+  veils = capVeils(veils, Math.floor(lay.n / ENDLESS.TILES_PER_VEIL));
   const want = veils ? (veils.cloud || 0) + (veils.lantern || 0) + (veils.snow || 0) : 0;
   const base = { li, layout: lay.name, scale: ten ? 10 : 8, stock: Math.round(lay.n * ENDLESS.FILM_PER_TILE) + (ten ? CFG.DECK_10_EXTRA : 0), script: null, veils, wilds: 0, endless: true,
     stars: has('star') ? CFG.STAR_PER_LEVEL : 0, flash: has('flash') ? 2 : 0, order: has('order'), rain: has('rain') ? 2 : 0, intro: EL.intro, elements: EL.list };
-  let best = null, bestD = 9;
-  for (let c = 0; c < ENDLESS.CANDIDATES; c++){
-    const spec = Object.assign({}, base, { seed: n * 1000 + c });
-    if (makeState(spec).veil.filter(Boolean).length !== want) continue;
-    let rw = 0, gw = 0;
-    for (let i = 0; i < ENDLESS.RUNS_R; i++) rw += runBot(makeState(spec), 'random', i + 1, { extra: true }).win ? 1 : 0;
-    for (let i = 0; i < ENDLESS.RUNS_G; i++) gw += runBot(makeState(spec), 'greedy', i + 1, { extra: true }).win ? 1 : 0;
-    const rr = rw / ENDLESS.RUNS_R, g = gw / ENDLESS.RUNS_G, d = rr < band[0] ? band[0] - rr : rr > band[1] ? rr - band[1] : 0;
-    spec.check = { random: rr, greedy: g, band };
-    if (g >= gmin && d === 0){ best = spec; break; }
-    if (g >= 0.5 && d < bestD){ bestD = d; best = spec; }
+  let best = null, bestD = 9, any = null;
+  // Раздачи в окне нет и уровень выходит тяжелее окна — плёнка длиннее на кадр (до FILM_ADD); на узких формах с завесами это нужно чаще.
+  for (let add = 0; add <= ENDLESS.FILM_ADD; add++){
+    for (let c = 0; c < ENDLESS.CANDIDATES; c++){
+      const spec = Object.assign({}, base, { seed: n * 1000 + c, stock: base.stock + add });
+      if (makeState(spec).veil.filter(Boolean).length !== want) continue;
+      let rw = 0, gw = 0;
+      for (let i = 0; i < ENDLESS.RUNS_R; i++) rw += runBot(makeState(spec), 'random', i + 1, { extra: true }).win ? 1 : 0;
+      for (let i = 0; i < ENDLESS.RUNS_G; i++) gw += runBot(makeState(spec), 'greedy', i + 1, { extra: true }).win ? 1 : 0;
+      const rr = rw / ENDLESS.RUNS_R, g = gw / ENDLESS.RUNS_G, d = rr < band[0] ? band[0] - rr : rr > band[1] ? rr - band[1] : 0;
+      spec.check = { random: rr, greedy: g, band, add };
+      if (!any || g > any.check.greedy) any = spec;
+      if (g >= gmin && d === 0){ bestD = 0; best = spec; break; }
+      if (g >= 0.5 && d < bestD){ bestD = d; best = spec; }
+    }
+    if (best && (bestD === 0 || best.check.random > band[1])) break;
   }
-  return (ENDLESS_CACHE[key] = best || Object.assign({}, base, { seed: n * 1000 }));
+  return (ENDLESS_CACHE[key] = best || any || Object.assign({}, base, { seed: n * 1000, stock: base.stock + ENDLESS.FILM_ADD }));
 }
 
+// Не больше max завес на уровень: лишние снимаются с самого частого вида, каждый вид остаётся хотя бы одной.
+function capVeils(v, max){
+  if (!v) return v;
+  const out = Object.assign({}, v), kinds = ['cloud', 'lantern', 'snow'].filter(k => out[k]);
+  let tot = kinds.reduce((a, k) => a + out[k], 0);
+  while (tot > max){ const k = kinds.filter(q => out[q] > 1).sort((a, b) => out[b] - out[a])[0]; if (!k) break; out[k]--; tot--; }
+  return out;
+}
 // Спецификация раздачи уровня li в режиме mode (8 | 10).
 function levelSpec(li, mode){
   if (li >= LEVELS.length) return endlessSpec(li, mode);
@@ -813,12 +836,11 @@ const ART = {
     day: 'assets/pano-day.jpg', golden: 'assets/pano-golden.jpg', sunset: 'assets/pano-sunset.jpg', dusk: 'assets/pano-dusk.jpg',
     night: 'assets/pano-night.jpg', midnight: 'assets/pano-midnight.jpg' },
   SPRITE: { cloud: 'assets/sprite-cloud.png', lantern: 'assets/sprite-lantern.png', eclipse: 'assets/sprite-eclipse.png', film: 'assets/sprite-film.png',
-    hand: 'assets/sprite-hand.png', deck: 'assets/sprite-deck.png' },
-  DECK_EDGE: 0.1,         // дальний край настила на спрайте — доля его высоты
+    hand: 'assets/sprite-hand.png' },
   HAND_TIP: [0.17, 0.12], // кончик пальца на спрайте руки — доли ширины и высоты
   HORIZON: 0.41,          // горизонт на всех панорамах, доля высоты (замер по перепаду яркости строк)
-  CROP: [0.04, 0.96],     // фото полароида — квадрат из панорамы по этой доле ширины
-  CROP_HOR: 0.56,         // горизонт на фото полароида, доля высоты фото
+  CROP: [0.12, 0.88],     // фото полароида — квадрат из панорамы по этой доле ширины (ближе — город крупнее)
+  CROP_HOR: 0.6,          // горизонт на фото полароида, доля высоты фото (больше неба — цвет времени читается)
   // Силуэт берега, города и моста над горизонтом: [x — доля ширины панорамы, высота — доля её высоты]. Диски светил прячутся за ним.
   SKYLINE: [[0, 0.028], [0.035, 0.034], [0.045, 0.05], [0.06, 0.05], [0.07, 0.03], [0.14, 0.022], [0.2, 0.016], [0.26, 0.02], [0.36, 0.03],
     [0.44, 0.05], [0.5, 0.075], [0.56, 0.07], [0.61, 0.074], [0.66, 0.045], [0.73, 0.03], [0.775, 0.03], [0.78, 0.07], [0.805, 0.07],
@@ -1026,7 +1048,7 @@ function photo(id, px){
     const g = c.createLinearGradient(0, 0, 0, px); g.addColorStop(0, '#0b0a18'); g.addColorStop(1, '#2a2040'); c.fillStyle = g; c.fillRect(0, 0, px, px);
     const sp = IMG['sprite:eclipse']; if (sp) c.drawImage(sp, px * 0.12, px * 0.08, px * 0.76, px * 0.76);
   } else {
-    const R = { x: 0, y: 0, w: px, h: px, hor: px * ART.CROP_HOR, cx: px / 2, rx: px * 0.44, ry: px * 0.5, sunR: px * 0.1, moonR: px * 0.085, cityH: px * 0.24, crop: ART.CROP, mini: true };
+    const R = { x: 0, y: 0, w: px, h: px, hor: px * ART.CROP_HOR, cx: px / 2, rx: px * 0.4, ry: px * 0.48, sunR: px * 0.12, moonR: px * 0.1, cityH: px * 0.24, crop: ART.CROP, mini: true };
     drawScene(c, R, id, id, 0, LP[id], 0);
     const v = c.createRadialGradient(px / 2, px / 2, px * 0.35, px / 2, px / 2, px * 0.75);   // лёгкая виньетка плёнки
     v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.28)'); c.fillStyle = v; c.fillRect(0, 0, px, px);
@@ -1038,7 +1060,7 @@ function rr(c, x, y, w, h, r){ c.beginPath(); c.roundRect ? c.roundRect(x, y, w,
 // o: scale/sx/sy — масштаб, lift — подъём (тень дальше), ring — обводка, tint — красная вспышка ошибки, veil — туча/фонарь {kind, a, t}.
 function drawPolaroid(c, cx, cy, w, rot, id, dev, o){
   o = o || {};
-  const h = w * CFG.POLA_RATIO, m = w * 0.06, ps = w - 2 * m, lift = o.lift || 0;
+  const h = w * CFG.POLA_RATIO, m = w * 0.05, ps = w - 2 * m, lift = o.lift || 0;
   c.save(); c.translate(cx, cy); c.rotate(rot);
   const sx = (o.scale || 1) * (o.sx || 1), sy = (o.scale || 1) * (o.sy || 1); if (sx !== 1 || sy !== 1) c.scale(sx, sy);
   const sh = o.shadow === undefined ? 0.28 : o.shadow;
@@ -1133,7 +1155,6 @@ const G = {
   filmShake: 0, filmBump: 0, hintPulse: 0, flash: 0, banner: null, orbitAt: 0, orbitDir: 1, land: 0, sweep: null, streakPop: 0,
   eclipse: { on: false, t0: -1e9 },
   runLog: [], pipPop: {},     // времена текущего хода шкалы и момент «наполнения» каждой ячейки
-  pileHist: [], pileSeed: 1, stripShift: 0,   // кадры под верхним в стопке; разброс стопки; момент сдвига ленты при доборе
   press: -1,                  // кадр под пальцем (приподнят)
   ending: null,               // { at, screen } — показать экран после анимаций
   lastInput: 0, lastAct: 0, errAt: 0,
@@ -1179,26 +1200,28 @@ function orbit(dir){
 }
 
 // --- звук: WebAudio-синтез без файлов, ленивый старт по первому жесту (§8) ---
-// Фон зависит от времени суток: пэд-аккорд (выше и светлее днём, ниже ночью), птицы утром, цикады днём, сверчки вечером.
+// Фон — спокойный эмбиент (Андрей 29.10 после телефона: прежний пэд и цикады звучали как гул). Постоянного тона нет:
+// редкие мягкие ноты пентатоники (днём мажорной, вечером и ночью минорной) уходят в эхо, под ними — тихий прибой; утром — птицы.
 const AMB = {
-  dawn:     { notes: [72, 76, 79], pad: 1,   cut: 1400, birds: 0.8,  cic: 0,    crk: 0.15 },
-  morning:  { notes: [74, 78, 81], pad: 0.9, cut: 1800, birds: 1,    cic: 0.1,  crk: 0 },
-  late:     { notes: [76, 79, 83], pad: 0.8, cut: 2000, birds: 0.6,  cic: 0.35, crk: 0 },
-  noon:     { notes: [77, 81, 84], pad: 0.8, cut: 2200, birds: 0.3,  cic: 0.7,  crk: 0 },
-  day:      { notes: [76, 80, 83], pad: 0.8, cut: 2000, birds: 0.15, cic: 1,    crk: 0 },
-  golden:   { notes: [69, 73, 76], pad: 1,   cut: 1200, birds: 0.25, cic: 0.45, crk: 0 },
-  sunset:   { notes: [67, 70, 74], pad: 1,   cut: 1000, birds: 0.1,  cic: 0.15, crk: 0.3 },
-  dusk:     { notes: [64, 67, 71], pad: 1,   cut: 800,  birds: 0,    cic: 0,    crk: 0.7 },
-  night:    { notes: [57, 60, 64], pad: 1,   cut: 600,  birds: 0,    cic: 0,    crk: 1 },
-  midnight: { notes: [52, 55, 59], pad: 0.9, cut: 500,  birds: 0,    cic: 0,    crk: 0.5 },
-  eclipse:  { notes: [45, 52, 57], pad: 1.1, cut: 380,  birds: 0,    cic: 0,    crk: 0.2 },
+  dawn:     { root: 74, scale: 'maj', gap: 2.4, cut: 2400, sea: 0.8, birds: 0.5 },
+  morning:  { root: 76, scale: 'maj', gap: 2.2, cut: 2800, sea: 0.7, birds: 1 },
+  late:     { root: 76, scale: 'maj', gap: 2.2, cut: 3000, sea: 0.7, birds: 0.4 },
+  noon:     { root: 77, scale: 'maj', gap: 2.6, cut: 3000, sea: 0.6, birds: 0 },
+  day:      { root: 74, scale: 'maj', gap: 2.6, cut: 2800, sea: 0.7, birds: 0 },
+  golden:   { root: 72, scale: 'maj', gap: 2.8, cut: 2200, sea: 0.9, birds: 0 },
+  sunset:   { root: 69, scale: 'min', gap: 3.0, cut: 1900, sea: 1,   birds: 0 },
+  dusk:     { root: 69, scale: 'min', gap: 3.2, cut: 1600, sea: 1,   birds: 0 },
+  night:    { root: 64, scale: 'min', gap: 3.6, cut: 1300, sea: 0.9, birds: 0 },
+  midnight: { root: 62, scale: 'min', gap: 4.0, cut: 1100, sea: 0.8, birds: 0 },
+  eclipse:  { root: 57, scale: 'min', gap: 4.4, cut: 900,  sea: 0.6, birds: 0 },
 };
-const SND = { MASTER: 0.9, PAD: 0.045, CIC: 0.022, CRK: 0.018, BIRD: 0.035, SHUTTER: 0.4, NOTE: 0.09 };
+const SCALES_AMB = { maj: [0, 2, 4, 7, 9, 12, 14, 16], min: [0, 3, 5, 7, 10, 12, 15, 17] };
+const SND = { MASTER: 0.9, AMB: 0.032, BASS: 0.022, SEA: 0.05, ECHO: 0.42, BIRD: 0.025, SHUTTER: 0.4, NOTE: 0.09 };
 const PENTA = [0, 2, 4, 7, 9];
 const midiHz = (m) => 440 * Math.pow(2, (m - 69) / 12);
 const sndRnd = mulberry32(4242);
 const Snd = {
-  ac: null, master: null, noise: null, pad: [], padGain: null, padFilter: null, cic: null, crk: null, birds: 0, nextBird: 0, timeId: null,
+  ac: null, master: null, noise: null, amb: null, ambCut: null, sea: null, seaCut: null, A: null, step: 2, nextNote: 0, nNotes: 0, birds: 0, nextBird: 0, timeId: null,
   init(){
     if (this.ac){ if (this.ac.state === 'suspended') try { this.ac.resume(); } catch (e) {} return; }
     try { this.ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { this.ac = null; return; }
@@ -1207,47 +1230,57 @@ const Snd = {
     const len = ac.sampleRate * 2, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0), nr = mulberry32(99);
     for (let i = 0; i < len; i++) d[i] = nr() * 2 - 1;
     this.noise = buf;
-    this.padFilter = ac.createBiquadFilter(); this.padFilter.type = 'lowpass'; this.padFilter.frequency.value = 1200;
-    this.padGain = ac.createGain(); this.padGain.gain.value = 0;
-    this.padFilter.connect(this.padGain).connect(this.master);
-    for (let i = 0; i < 3; i++){ const o = ac.createOscillator(); o.type = i === 0 ? 'triangle' : 'sine'; o.frequency.value = 220; o.detune.value = (i - 1) * 6; o.connect(this.padFilter); o.start(); this.pad.push(o); }
-    this.cic = this.amLayer(4800, 6, 38, 0);
-    const co = ac.createOscillator(); co.frequency.value = 4300; const g1 = ac.createGain(); g1.gain.value = 0.5;
-    const l1 = ac.createOscillator(); l1.type = 'square'; l1.frequency.value = 28; const l1g = ac.createGain(); l1g.gain.value = 0.5; l1.connect(l1g).connect(g1.gain);
-    const g2 = ac.createGain(); g2.gain.value = 0.5;
-    const l2 = ac.createOscillator(); l2.type = 'square'; l2.frequency.value = 1.4; const l2g = ac.createGain(); l2g.gain.value = 0.5; l2.connect(l2g).connect(g2.gain);
-    this.crk = ac.createGain(); this.crk.gain.value = 0;
-    co.connect(g1).connect(g2).connect(this.crk).connect(this.master); co.start(); l1.start(); l2.start();
+    // шина нот: мягкий срез + эхо с обратной связью (ноты тают, а не обрываются)
+    this.ambCut = ac.createBiquadFilter(); this.ambCut.type = 'lowpass'; this.ambCut.frequency.value = 2400;
+    this.amb = ac.createGain(); this.amb.gain.value = 1; this.amb.connect(this.ambCut).connect(this.master);
+    const dl = ac.createDelay(2), fb = ac.createGain(), wet = ac.createGain(), dcut = ac.createBiquadFilter();
+    dl.delayTime.value = 0.46; fb.gain.value = 0.42; wet.gain.value = SND.ECHO; dcut.type = 'lowpass'; dcut.frequency.value = 1700;
+    this.ambCut.connect(dl); dl.connect(dcut).connect(fb).connect(dl); dcut.connect(wet).connect(this.master);
+    // прибой: бурый шум 6 с, низкий срез, громкость дышит медленной волной
+    const sl = ac.sampleRate * 6, sb = ac.createBuffer(1, sl, ac.sampleRate), sd = sb.getChannelData(0), sr = mulberry32(7); let br = 0;
+    for (let i = 0; i < sl; i++){ br = (br + 0.02 * (sr() * 2 - 1)) / 1.02; sd[i] = br * 3.5; }
+    const src = ac.createBufferSource(); src.buffer = sb; src.loop = true;
+    this.seaCut = ac.createBiquadFilter(); this.seaCut.type = 'lowpass'; this.seaCut.frequency.value = 520;
+    const swell = ac.createGain(); swell.gain.value = 0.6;
+    const lfo = ac.createOscillator(); lfo.frequency.value = 0.085; const lg = ac.createGain(); lg.gain.value = 0.4; lfo.connect(lg).connect(swell.gain);
+    this.sea = ac.createGain(); this.sea.gain.value = 0;
+    src.connect(this.seaCut).connect(swell).connect(this.sea).connect(this.master); src.start(); lfo.start();
+    this.nextNote = nowMs() + 600;
     if (this.timeId) this.setTime(this.timeId, true);
     log('sound', 'init');
   },
-  amLayer(freq, q, rate, level){
-    const ac = this.ac, src = ac.createBufferSource(); src.buffer = this.noise; src.loop = true;
-    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = freq; bp.Q.value = q;
-    const am = ac.createGain(); am.gain.value = 0.5;
-    const lfo = ac.createOscillator(); lfo.type = 'square'; lfo.frequency.value = rate; const lg = ac.createGain(); lg.gain.value = 0.5; lfo.connect(lg).connect(am.gain);
-    const out = ac.createGain(); out.gain.value = level;
-    src.connect(bp).connect(am).connect(out).connect(this.master); src.start(); lfo.start();
-    return out;
-  },
   setTime(id, instant){
     this.timeId = id; if (!this.ac) return;
-    const A = AMB[id], t = this.ac.currentTime, tau = instant ? 0.01 : 0.15;
-    A.notes.forEach((m, i) => this.pad[i].frequency.setTargetAtTime(midiHz(m - 12), t, tau));
-    this.padFilter.frequency.setTargetAtTime(A.cut, t, tau);
-    this.padGain.gain.setTargetAtTime(A.pad * SND.PAD, t, tau * 2);
-    this.cic.gain.setTargetAtTime(A.cic * SND.CIC, t, tau * 2);
-    this.crk.gain.setTargetAtTime(A.crk * SND.CRK, t, tau * 2);
+    const A = AMB[id], t = this.ac.currentTime, tau = instant ? 0.01 : 0.6;
+    this.A = A;
+    this.ambCut.frequency.setTargetAtTime(A.cut, t, tau);
+    this.sea.gain.setTargetAtTime(A.sea * SND.SEA, t, tau);
     this.birds = A.birds;
   },
   setMuted(m){ if (this.master) this.master.gain.setTargetAtTime(m ? 0 : SND.MASTER, this.ac.currentTime, 0.03); },
   tick(now){
-    if (!this.ac || G.save.muted || G.paused || this.birds < 0.05) return;
-    if (now < this.nextBird) return;
-    this.nextBird = now + (700 + sndRnd() * 2200) / this.birds;
-    if (this.nextBird - now > 6000) return;
+    if (!this.ac || G.save.muted || G.paused || !this.A) return;
+    if (now >= this.nextNote){
+      const A = this.A, sc = SCALES_AMB[A.scale], t = this.ac.currentTime + 0.02;
+      this.step = clamp(this.step + Math.round((sndRnd() - 0.5) * 3.2), 0, sc.length - 1);   // мелодия бродит ступенями
+      this.bell(midiHz(A.root + sc[this.step]), t, SND.AMB * (0.7 + 0.3 * sndRnd()), 3.2);
+      if (sndRnd() < 0.3) this.bell(midiHz(A.root + sc[Math.max(0, this.step - 2)]), t + 0.22, SND.AMB * 0.55, 3);
+      if (this.nNotes++ % 4 === 0) this.bell(midiHz(A.root - 24 + sc[0]), t, SND.BASS, 5, 0.6);
+      this.nextNote = now + 1000 * A.gap * (0.7 + 0.6 * sndRnd());
+    }
+    if (this.birds < 0.05 || now < this.nextBird) return;
+    this.nextBird = now + (1500 + sndRnd() * 4000) / this.birds;
+    if (this.nextBird - now > 9000) return;
     const t = this.ac.currentTime, base = 2600 + sndRnd() * 1400, n = 2 + Math.floor(sndRnd() * 3);
     for (let i = 0; i < n; i++) this.chirp(t + i * 0.11, base * (1 + sndRnd() * 0.15), SND.BIRD * this.birds);
+  },
+  // мягкий «колокольчик»: синус и тихий обертон, плавная атака, долгое затухание
+  bell(f, t, vol, dur, att){
+    const o = this.ac.createOscillator(), o2 = this.ac.createOscillator(), g = this.ac.createGain(), g2 = this.ac.createGain();
+    o.frequency.value = f; o2.frequency.value = f * 2; g2.gain.value = 0.18;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + (att || 0.06)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); o2.connect(g2).connect(g); g.connect(this.amb);
+    o.start(t); o2.start(t); o.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
   },
   chirp(t, f, vol){
     const o = this.ac.createOscillator(), g = this.ac.createGain();
@@ -1427,7 +1460,7 @@ function startLevel(li){
   lightTo(G.vfId, 0, true); Snd.setTime(G.vfId, true);
   G.flights = []; G.bonusFlights = []; G.shakes = {}; G.reveal = {}; G.unveil = {}; G.parts = []; G.floats = [];
   G.filmShake = 0; G.filmBump = 0; G.hintPulse = 0; G.flash = 0; G.banner = null; G.orbitAt = 0; G.ending = null; G.land = 0; G.sweep = null; G.streakPop = 0;
-  G.eclipse = { on: false, t0: -1e9 }; G.rainFx = { on: false, t0: -1e9 }; G.rainbowFx = { on: false, t0: -1e9 }; G.revealT = -1e9; G.starFx = null; G.orderFx = null; G.runLog = []; G.pipPop = {}; G.press = -1; G.pileHist = []; G.pileSeed = li * 7 + 1; G.stripShift = 0;
+  G.eclipse = { on: false, t0: -1e9 }; G.rainFx = { on: false, t0: -1e9 }; G.rainbowFx = { on: false, t0: -1e9 }; G.revealT = -1e9; G.starFx = null; G.orderFx = null; G.runLog = []; G.pipPop = {}; G.press = -1;
   G.lastInput = G.lastAct = nowMs(); G.errAt = 0;
   G.lv = newLv(li);
   geomCache = null;
@@ -1543,8 +1576,8 @@ function tapFilm(){
   const wasWild = s.wildTop, wasRainbow = s.wildKind === 'rainbow', vb = s.veil.slice(), ev = step(s, 'draw'), id = s.ids[ev.v];
   if (wasRainbow) G.rainbowFx = { on: false, t0: now };
   G.runLog = []; G.pipPop = {};
-  const Pg = panelGeom(); G.stripShift = now;
-  G.flights.push({ id, x0: Pg.strip.x + Pg.strip.fw / 2, y0: Pg.strip.y + Pg.strip.h / 2, w0: Pg.strip.fw, rot0: -0.2, t0: now, dur: CFG.FLIGHT_MS / G.timeScale, dir: 1, fromFilm: true });
+  const Pg = panelGeom();
+  G.flights.push({ id, x0: Pg.filmC.x, y0: Pg.filmC.y - 10, w0: 30, rot0: -0.2, t0: now, dur: CFG.FLIGHT_MS / G.timeScale, dir: 1, fromFilm: true });
   fxStart('flight', CFG.FLIGHT_MS, id);
   if (wasWild) G.eclipse = { on: false, t0: now };
   lightTo(id, 0); Snd.setTime(id); Snd.film(); G.filmBump = now;
@@ -1590,13 +1623,13 @@ function endLevel(result){
 const cv = $('cv'), ctx = cv.getContext('2d');
 const VW = 400;
 let scale = 1, W = VW, H = 700, DPR = 1, geomCache = null;
-function horizonY(){ return Math.round(clamp(H * CFG.HORIZON_FRAC, 190, 360)); }
+function horizonY(){ return Math.round(clamp(H * CFG.HORIZON_FRAC, 150, 260)); }
 // Позиции кадров на столе: ширина из ширины кадра, ряды с перекрытием, поле между горизонтом и панелью.
 function fieldGeom(){
   if (geomCache && geomCache.W === W && geomCache.H === H && geomCache.lay === G.s.lay) return geomCache;
   const lay = G.s.lay, span = lay.width;
   let pitch = Math.min(CFG.TILE_MAX + CFG.TILE_GAP, (VW - 2 * CFG.SIDE) / span);
-  const top0 = horizonY() + 16, bot0 = panelGeom().top - 16, avail = bot0 - top0;
+  const top0 = horizonY() + 12, bot0 = panelGeom().top - 6, avail = bot0 - top0;
   const fh = (p) => (p - CFG.TILE_GAP) * CFG.POLA_RATIO * (1 + lay.height * CFG.ROW_STEP);
   if (fh(pitch) > avail) pitch = CFG.TILE_GAP + avail / (CFG.POLA_RATIO * (1 + lay.height * CFG.ROW_STEP));
   const tw = pitch - CFG.TILE_GAP, th = tw * CFG.POLA_RATIO, rowStep = th * CFG.ROW_STEP, h = th + lay.height * rowStep;
@@ -1672,7 +1705,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // --- рендер ---
-function bigR(){ const hor = horizonY(); return { x: 0, y: 0, w: W, h: H, hor, cx: W / 2, rx: W * 0.46, ry: hor - 70, sunR: 21, moonR: 16, cityH: 78, crop: [0, 1], mini: false }; }
+function bigR(){ const hor = horizonY(); return { x: 0, y: 0, w: W, h: H, hor, cx: W / 2, rx: W * 0.46, ry: hor - 62, sunR: 18, moonR: 14, cityH: 60, crop: [0, 1], mini: false }; }
 function render(){
   const now = nowMs();
   ctx.setTransform(DPR * scale, 0, 0, DPR * scale, 0, 0);
@@ -1779,160 +1812,125 @@ function drawField(now){
       mark: s.flash[k] ? 'flash' : s.rain[k] ? 'rain' : null, now });
   }
 }
-// Низ экрана «Пирс» (согласовано с Андреем 29.10, вариант В): деревянный настил над водой. На нём —
-// кассета плёнки с лентой негативов (каждый негатив — кадр колоды, лента тает с каждым добором),
-// стопка снятых полароидов (сверху — текущий кадр), из-под стопки выглядывают соседние времена со стрелками мелом,
-// под лентой — шкала направления мелом, справа — латунный жетон «Затмения».
+// Низ экрана — фотоаппарат (Андрей 29.10 после теста на телефоне: пирс занимал много места и читался хуже; «на фотик, но понятный»).
+// Компактный корпус во всю ширину: в центре видоискатель с текущим кадром, по бокам два «объектива» с соседними временами
+// и подписями «раньше» / «позже», слева счётчик плёнки (тап — добор), справа кнопка «Затмения», на верхней панели —
+// лампочки шкалы направления и счётчик серии.
 function panelGeom(){
-  const top = H - CFG.PANEL_H, cx = 200, cy = H - 64, vfW = CFG.VF_W;
-  return { top, cx, cy, vfW, thW: CFG.THUMB_W, prevX: cx - 82, nextX: cx + 82, thY: cy + 10,
-    can: { x: 8, y: top - 6, w: 66, h: 86 },                       // кассета стоит на краю настила
-    strip: { x: 62, y: top + 20, h: 32, fw: 26 },                  // лента: высота и шаг кадра-негатива
-    film: { x: 6, y: top - 8, w: VW - 12, h: 76 },                 // зона тапа «плёнка»: кассета и лента
-    gaugeY: top + 70, wild: { x: VW - 34, y: H - 48, r: 23 } };
+  const top = H - CFG.PANEL_H, by = top + 10, bh = H - 6 - by, cy = by + 26 + (bh - 26) / 2 - 8, cx = VW / 2, vfW = CFG.VF_W;
+  return { top, by, bh, cx, cy, vfW, lensR: CFG.THUMB_W / 2, prevX: cx - 86, nextX: cx + 86,
+    filmC: { x: 33, y: cy }, film: { x: 6, y: by, w: 54, h: bh },
+    plateY: by + 12, wild: { x: VW - 36, y: cy - 6, r: 22 } };
 }
-// Настил: спрайт GPT по ширине экрана, дальний край — на линии top; ниже картинки тянется её нижняя строка.
-function drawDeck(Pg){
-  const im = IMG['sprite:deck'];
-  if (im){
-    const k = VW / im.width, ih = im.height * k, y0 = Pg.top - ART.DECK_EDGE * ih;
-    ctx.drawImage(im, 0, y0, VW, ih);
-    if (y0 + ih < H) ctx.drawImage(im, 0, im.height - 2, im.width, 2, 0, y0 + ih - 1, VW, H - y0 - ih + 1);
-  } else {
-    const g = ctx.createLinearGradient(0, Pg.top, 0, H); g.addColorStop(0, '#9a6a3c'); g.addColorStop(1, '#5e3a1e');
-    ctx.fillStyle = g; ctx.fillRect(0, Pg.top, VW, H - Pg.top);
-    ctx.strokeStyle = 'rgba(40,20,8,0.45)'; ctx.lineWidth = 1.5;
-    for (let i = 0; i <= 10; i++){ const xb = i * VW / 10, xt = VW / 2 + (xb - VW / 2) * 0.86; ctx.beginPath(); ctx.moveTo(xt, Pg.top); ctx.lineTo(xb, H); ctx.stroke(); }
-    ctx.fillStyle = 'rgba(30,14,6,0.5)'; ctx.fillRect(0, Pg.top, VW, 5);
-  }
-  // мягкая тень от края настила на воде
-  const sh = ctx.createLinearGradient(0, Pg.top - 14, 0, Pg.top); sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,0,0,0.22)');
-  ctx.fillStyle = sh; ctx.fillRect(0, Pg.top - 14, VW, 14);
-}
-// Негатив на ленте: одинаковый для всех кадров колоды (порядок плёнки игрок не знает) — инвертированный тёплый снимок залива.
-let NEG_CACHE = null;
-function negative(px){
-  px = Math.max(8, Math.round(px));
-  if (NEG_CACHE && NEG_CACHE.width === px) return NEG_CACHE;
-  const c = document.createElement('canvas'); c.width = c.height = px; const x = c.getContext('2d');
-  x.drawImage(photo('noon', px), 0, 0, px, px);
-  x.globalCompositeOperation = 'difference'; x.fillStyle = '#fff'; x.fillRect(0, 0, px, px);
-  x.globalCompositeOperation = 'multiply'; x.fillStyle = '#e8904a'; x.fillRect(0, 0, px, px);
-  x.globalCompositeOperation = 'source-over'; x.fillStyle = 'rgba(40,18,6,0.35)'; x.fillRect(0, 0, px, px);
-  return (NEG_CACHE = c);
+// Корпус рисуется один раз в отдельный холст (кожзам с точками, хромированная верхняя панель, винты) — дальше только копия.
+let CAMERA_CACHE = null;
+function cameraBody(Pg){
+  const key = W + 'x' + H + ':' + DPR + ':' + scale;
+  if (CAMERA_CACHE && CAMERA_CACHE.key === key) return CAMERA_CACHE.c;
+  const c = document.createElement('canvas'); c.width = Math.round(VW * scale * DPR); c.height = Math.round((Pg.bh + 12) * scale * DPR);
+  const x = c.getContext('2d'); x.scale(scale * DPR, scale * DPR);
+  const w = VW - 12, h = Pg.bh;
+  x.fillStyle = 'rgba(0,0,0,0.35)'; rr(x, 8, 6, w, h, 20); x.fill();
+  const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#34343c'); g.addColorStop(1, '#1d1d22');
+  x.fillStyle = g; rr(x, 6, 2, w, h, 20); x.fill();
+  // кожзам: мелкие светлые точки
+  const rnd = mulberry32(55); x.fillStyle = 'rgba(255,255,255,0.05)';
+  for (let i = 0; i < 900; i++) x.fillRect(10 + rnd() * (w - 8), 26 + rnd() * (h - 30), 1.2, 1.2);
+  // хромированная верхняя панель
+  const pg = x.createLinearGradient(0, 2, 0, 26); pg.addColorStop(0, '#f1f2f5'); pg.addColorStop(0.5, '#c9cbd2'); pg.addColorStop(1, '#9fa2ab');
+  x.fillStyle = pg; x.save(); rr(x, 6, 2, w, h, 20); x.clip(); x.fillRect(6, 2, w, 24); x.restore();
+  x.fillStyle = 'rgba(0,0,0,0.25)'; x.fillRect(12, 26, w - 12, 1.5);
+  for (const sx of [18, VW - 18]){ x.fillStyle = '#8b8e96'; x.beginPath(); x.arc(sx, 14, 3, 0, 6.2832); x.fill(); x.strokeStyle = '#5c5f66'; x.lineWidth = 1; x.beginPath(); x.moveTo(sx - 2, 14); x.lineTo(sx + 2, 14); x.stroke(); }
+  CAMERA_CACHE = { key, c };
+  return c;
 }
 function drawPanel(now){
   const s = G.s, Pg = panelGeom();
-  drawDeck(Pg);
+  ctx.drawImage(cameraBody(Pg), 0, Pg.by - 2, VW, Pg.bh + 12);
   drawFilm(now, Pg);
   drawGauge(now, Pg);
-  // соседние времена — выглядывают из-под стопки; после ошибки подсвечиваются
-  const hp = G.hintPulse ? clamp(1 - (now - G.hintPulse) / 900, 0, 1) : 0, pul = 1 + 0.12 * hp * Math.abs(Math.sin((now - G.hintPulse) / 90));
-  const ring = hp > 0 ? 'rgba(255,214,120,' + (0.4 + 0.6 * hp).toFixed(2) + ')' : null;
-  if (s.wildTop){
-    chalkText('любой', Pg.prevX - 6, Pg.thY + 4, 14); chalkText('любой', Pg.nextX + 6, Pg.thY + 4, 14);
-  } else {
-    const V = s.V, prevId = s.ids[(s.top - 1 + V) % V], nextId = s.ids[(s.top + 1) % V];
-    drawPolaroid(ctx, Pg.prevX, Pg.thY, Pg.thW, -0.3, prevId, 1, { scale: pul, ring, shadow: 0.35 });
-    drawPolaroid(ctx, Pg.nextX, Pg.thY, Pg.thW, 0.3, nextId, 1, { scale: pul, ring, shadow: 0.35 });
-    chalkArrow(Pg.prevX - Pg.thW * 0.72, Pg.thY - 6, -1); chalkArrow(Pg.nextX + Pg.thW * 0.72, Pg.thY - 6, 1);
-  }
-  // стопка: прошлые кадры вразброс, сверху — текущий; при посадке нового — сплющивание и облачко пыли
-  G.pileHist.slice(0, 3).reverse().forEach((id, i) => {
-    const r = mulberry32(G.pileSeed + (G.pileHist.length - i) * 13), dx = (r() - 0.5) * 16, dy = (r() - 0.5) * 8, rot = (r() - 0.5) * 0.5;
-    drawPolaroid(ctx, Pg.cx + dx, Pg.cy + dy, Pg.vfW, rot, id, 1, { shadow: 0.3 });
-  });
-  const lt = G.land ? clamp((now - G.land) / (CFG.LAND_MS / G.timeScale), 0, 1) : 1, sq = lt < 1 ? Math.sin(lt * Math.PI) * (1 - lt) : 0;
-  drawPolaroid(ctx, Pg.cx, Pg.cy, Pg.vfW, -0.04, G.vfId, 1, { shadow: 0.42, sx: 1 + 0.08 * sq, sy: 1 - 0.07 * sq });
+  // объективы: соседние времена; после ошибки подсвечиваются золотом
+  const hp = G.hintPulse ? clamp(1 - (now - G.hintPulse) / 900, 0, 1) : 0, pul = 1 + 0.1 * hp * Math.abs(Math.sin((now - G.hintPulse) / 90));
+  const V = s.V, prevId = s.ids[(s.top - 1 + V) % V], nextId = s.ids[(s.top + 1) % V];
+  drawLens(Pg.prevX, Pg.cy, Pg.lensR * pul, s.wildTop ? null : prevId, hp);
+  drawLens(Pg.nextX, Pg.cy, Pg.lensR * pul, s.wildTop ? null : nextId, hp);
+  const lab = (t, x) => { ctx.fillStyle = 'rgba(235,236,240,0.85)'; ctx.font = '700 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(t, x, Pg.cy + Pg.lensR + 11); };
+  lab(s.wildTop ? 'любой' : '‹ раньше', Pg.prevX); lab(s.wildTop ? 'любой' : 'позже ›', Pg.nextX);
+  // видоискатель: рамка и текущий кадр; при посадке — сплющивание и шторка
+  const v = Pg.vfW, lt = G.land ? clamp((now - G.land) / (CFG.LAND_MS / G.timeScale), 0, 1) : 1, sq = lt < 1 ? Math.sin(lt * Math.PI) * (1 - lt) : 0;
+  ctx.save(); ctx.translate(Pg.cx, Pg.cy); ctx.scale(1 + 0.06 * sq, 1 - 0.05 * sq);
+  ctx.fillStyle = '#0c0c10'; rr(ctx, -v / 2 - 7, -v / 2 - 7, v + 14, v + 14, 10); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1.5; rr(ctx, -v / 2 - 7, -v / 2 - 7, v + 14, v + 14, 10); ctx.stroke();
+  ctx.drawImage(photo(G.vfId, v * scale * DPR), -v / 2, -v / 2, v, v);
+  if (lt < 1){ ctx.beginPath(); ctx.rect(-v / 2, -v / 2, v, v); ctx.arc(0, 0, Math.max(0.1, v * 0.75 * easeOut(lt)), 0, 6.2832, true); ctx.fillStyle = 'rgba(8,8,14,' + (0.9 * (1 - lt)).toFixed(3) + ')'; ctx.fill('evenodd'); }
+  ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 2;
+  const L = 10, e = v / 2 - 4;
+  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]){ ctx.beginPath(); ctx.moveTo(sx * e, sy * e - sy * L); ctx.lineTo(sx * e, sy * e); ctx.lineTo(sx * e - sx * L, sy * e); ctx.stroke(); }
+  ctx.restore();
   drawWildButton(now, Pg);
 }
-// Мел на досках: стрелка «раньше» / «позже» и подписи — белые штрихи с лёгкой дрожью.
-function chalkArrow(x, y, dir){
-  ctx.save(); ctx.strokeStyle = 'rgba(250,246,236,0.85)'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  ctx.beginPath(); ctx.moveTo(x - dir * 2, y + 8); ctx.quadraticCurveTo(x + dir * 8, y + 10, x + dir * 18, y + 2); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x + dir * 10, y - 2); ctx.lineTo(x + dir * 19, y + 2); ctx.lineTo(x + dir * 12, y + 9); ctx.stroke();
-  ctx.restore();
+// Объектив: хромированное кольцо, внутри — фото времени (круг); на «Затмении» и радуге — пустое тёмное стекло.
+function drawLens(x, y, r, id, glow){
+  const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.4, 2, x, y, r + 6); g.addColorStop(0, '#f4f5f8'); g.addColorStop(1, '#7d8089');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r + 5, 0, 6.2832); ctx.fill();
+  ctx.fillStyle = '#0b0b10'; ctx.beginPath(); ctx.arc(x, y, r + 1, 0, 6.2832); ctx.fill();
+  if (id){ ctx.save(); ctx.beginPath(); ctx.arc(x, y, r - 1, 0, 6.2832); ctx.clip(); ctx.drawImage(photo(id, 2 * r * scale * DPR), x - r, y - r, 2 * r, 2 * r); ctx.restore(); }
+  const gl = ctx.createLinearGradient(x - r, y - r, x + r, y + r); gl.addColorStop(0, 'rgba(255,255,255,0.28)'); gl.addColorStop(0.45, 'rgba(255,255,255,0)');
+  ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(x, y, r - 1, 0, 6.2832); ctx.fill();
+  if (glow > 0){ ctx.strokeStyle = 'rgba(255,214,120,' + (0.4 + 0.6 * glow).toFixed(2) + ')'; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.arc(x, y, r + 6, 0, 6.2832); ctx.stroke(); }
 }
 function chalkText(t, x, y, size){
   ctx.save(); ctx.font = '700 ' + size + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillStyle = 'rgba(250,246,236,0.9)'; ctx.shadowColor = 'rgba(0,0,0,0.25)'; ctx.shadowBlur = 0; ctx.fillText(t, x, y); ctx.restore();
+  ctx.fillStyle = 'rgba(250,246,236,0.95)'; ctx.fillText(t, x, y); ctx.restore();
 }
-// Плёнка: кассета (спрайт GPT) стоит на настиле, из неё тянется лента негативов — по кадру на каждый кадр колоды.
-// Счётчик на этикетке; лента пульсирует золотом, когда на столе нет хода; новые кадры шкалы приезжают в её конец.
+// Плёнка: кассета (спрайт GPT) и крупное число кадров на корпусе, подпись «плёнка»; светится, когда хода нет; тап — добор.
 function drawFilm(now, Pg){
-  const s = G.s, n = s.stock.length, noMove = !playable(s).length && n > 0, S = Pg.strip, C = Pg.can;
-  let dx = 0, bump = 1, glow = 0;
+  const s = G.s, n = s.stock.length, noMove = !playable(s).length && n > 0, C = Pg.filmC;
+  let dx = 0, bump = 1;
   if (G.filmShake){ const t = (now - G.filmShake) / 320; if (t < 1) dx = Math.sin(t * 28) * 3 * (1 - t); else G.filmShake = 0; }
-  if (G.filmBump){ const t = (now - G.filmBump) / 380; if (t < 1) bump = 1 + 0.12 * Math.sin(t * Math.PI) * (1 - t * 0.5); else G.filmBump = 0; }
-  if (noMove) glow = 0.5 + 0.5 * Math.abs(Math.sin(now / 260));
-  // лента: волной по доскам; сдвиг при доборе (кадры подтягиваются к кассете)
-  const shift = G.stripShift ? clamp(1 - (now - G.stripShift) / 260, 0, 1) * S.fw : 0, shown = Math.min(n, Math.floor((VW - S.x) / S.fw) + 1);
-  if (shown > 0){
-    ctx.save(); ctx.translate(dx, 0);
-    const len = shown * S.fw + 6;
-    ctx.fillStyle = '#20150e'; ctx.beginPath();
-    for (let i = 0; i <= shown; i++){ const x = S.x + i * S.fw + shift, y = S.y + Math.sin(i * 0.7 + 1) * 2.5; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
-    for (let i = shown; i >= 0; i--){ const x = S.x + i * S.fw + shift, y = S.y + S.h + Math.sin(i * 0.7 + 1) * 2.5; ctx.lineTo(x, y); }
-    ctx.closePath(); ctx.fill();
-    for (let i = 0; i < shown; i++){
-      const x = S.x + i * S.fw + shift, y = S.y + Math.sin(i * 0.7 + 1.35) * 2.5, fw = S.fw - 4, ih = S.h - 12;
-      ctx.drawImage(negative(fw * scale * DPR), x + 2, y + 6, fw, ih);
-      ctx.fillStyle = 'rgba(240,226,200,0.55)';
-      for (const yy of [y + 1.5, y + S.h - 4.5]) for (let h = 0; h < 3; h++) ctx.fillRect(x + 3 + h * (fw / 3), yy, 3, 3);
-    }
-    if (glow){ ctx.strokeStyle = 'rgba(255,214,120,' + glow.toFixed(2) + ')'; ctx.lineWidth = 3; rr(ctx, S.x - 4, S.y - 6, Math.min(len, VW - S.x) + 4, S.h + 12, 10); ctx.stroke(); }
-    ctx.restore();
-  }
-  // кассета поверх начала ленты
-  ctx.save(); ctx.translate(C.x + C.w / 2 + dx, C.y + C.h / 2); ctx.scale(bump, bump); if (noMove) ctx.rotate(Math.sin(now / 130) * 0.04);
+  if (G.filmBump){ const t = (now - G.filmBump) / 380; if (t < 1) bump = 1 + 0.14 * Math.sin(t * Math.PI) * (1 - t * 0.5); else G.filmBump = 0; }
+  if (noMove){ const gl = 0.5 + 0.5 * Math.abs(Math.sin(now / 260)); ctx.strokeStyle = 'rgba(255,214,120,' + gl.toFixed(2) + ')'; ctx.lineWidth = 3; rr(ctx, Pg.film.x + 4, Pg.by + 30, Pg.film.w - 6, Pg.cy + Pg.lensR + 20 - Pg.by - 30, 12); ctx.stroke(); }
+  ctx.save(); ctx.translate(C.x + dx, C.y - 10); ctx.scale(bump, bump); if (noMove) ctx.rotate(Math.sin(now / 130) * 0.05);
   const sp = IMG['sprite:film'];
-  if (sp){ if (!n) ctx.globalAlpha = 0.5; ctx.drawImage(sp, 0, 0, sp.width * 0.72, sp.height, -C.h * 0.5, -C.h * 0.55, C.h * 0.72, C.h); ctx.globalAlpha = 1; }
-  else { ctx.fillStyle = '#222'; rr(ctx, -C.w / 2, -C.h / 2, C.w * 0.7, C.h, 8); ctx.fill(); ctx.fillStyle = '#f2b632'; ctx.fillRect(-C.w / 2, -10, C.w * 0.7, 22); }
-  ctx.fillStyle = n ? '#2b1a04' : '#6b6358'; ctx.font = '900 21px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(String(n), -C.h * 0.14, C.h * 0.07);
+  if (sp){ if (!n) ctx.globalAlpha = 0.45; ctx.drawImage(sp, 0, 0, sp.width * 0.72, sp.height, -19, -27, 38, 52); ctx.globalAlpha = 1; }
+  ctx.fillStyle = n ? '#2b1a04' : '#6b6358'; ctx.font = '900 17px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(n), -5, 1);
   ctx.restore();
+  ctx.fillStyle = 'rgba(235,236,240,0.85)'; ctx.font = '700 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('плёнка', C.x, Pg.cy + Pg.lensR + 11);
 }
-// Шкала направления — мелом на досках: V клеток; ход в ту же сторону кладёт в клетку мини-кадр;
-// на полкруга нарисована плёнка (кадр на плёнку), в конце — затмение («Полный день»). Разворот начинает шкалу заново.
+// Шкала направления — лампочки на хромированной панели: горят цветом времени хода; на полкруга и в конце — значки наград.
 function drawGauge(now, Pg){
-  const s = G.s, V = s.V, half = gaugeHalf(s), sz = Math.min(14, 160 / V), gap = 4, w = V * (sz + gap) - gap, x0 = Pg.cx - w / 2, y = Pg.gaugeY - sz / 2;
-  const run = s.dirRun;
-  ctx.save(); ctx.strokeStyle = 'rgba(250,246,236,0.6)'; ctx.lineWidth = 1.6; ctx.lineJoin = 'round';
+  const s = G.s, V = s.V, half = gaugeHalf(s), gap = 15, x0 = Pg.cx - (V - 1) * gap / 2, y = Pg.plateY, run = s.dirRun;
   for (let i = 0; i < V; i++){
-    const x = x0 + i * (sz + gap), j = (i * 37) % 5 - 2;
-    if (i < run && G.runLog[i]){
-      const pt = G.pipPop[i] !== undefined ? clamp((now - G.pipPop[i]) / 260, 0, 1) : 1, ps = sz * (1 + 0.45 * Math.sin(pt * Math.PI) * (1 - pt));
-      ctx.drawImage(photo(G.runLog[i], sz * scale * DPR), x + sz / 2 - ps / 2, y + sz / 2 - ps / 2, ps, ps);
-    } else { ctx.beginPath(); ctx.moveTo(x + 0.5, y + 0.5 + j * 0.2); ctx.lineTo(x + sz, y + 0.5); ctx.lineTo(x + sz - 0.5, y + sz); ctx.lineTo(x, y + sz - 0.4); ctx.closePath(); ctx.stroke(); }
-    if ((i === half - 1 || i === V - 1) && !(i < run && G.runLog[i])){       // значок награды — в пустой клетке
-      const ic = i === V - 1 ? IMG['sprite:eclipse'] : IMG['sprite:film'], isz = sz * 0.9;
-      if (ic){ ctx.globalAlpha = 0.85; ctx.drawImage(ic, x + sz / 2 - isz / 2, y + sz / 2 - isz / 2, isz, isz); ctx.globalAlpha = 1; }
-    }
+    const x = x0 + i * gap, lit = i < run && G.runLog[i], pt = G.pipPop[i] !== undefined ? clamp((now - G.pipPop[i]) / 260, 0, 1) : 1, r = 5 * (1 + 0.5 * Math.sin(pt * Math.PI) * (1 - pt));
+    if (lit){ const c = hex(LIGHT[G.runLog[i]].mid); const gg = ctx.createRadialGradient(x, y, 0, x, y, r * 2.2); gg.addColorStop(0, rgba(c, 0.9)); gg.addColorStop(1, rgba(c, 0)); ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(x, y, r * 2.2, 0, 6.2832); ctx.fill(); ctx.fillStyle = rgba(mixC(c, [255, 255, 255], 0.35)); }
+    else ctx.fillStyle = '#5d6068';
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1; ctx.stroke();
+    if (i === half - 1 || i === V - 1){ const ic = i === V - 1 ? IMG['sprite:eclipse'] : IMG['sprite:film']; if (ic && !lit) ctx.drawImage(ic, x - 4, y - 4, 8, 8); }
   }
-  if (s.dir && run) chalkArrow(s.dir > 0 ? x0 + w + 4 : x0 - 4, y + sz / 2 - 6, s.dir);
-  ctx.restore();
-  if (s.streak > 1){
-    const pt = G.streakPop ? clamp((now - G.streakPop) / 240, 0, 1) : 1, k = 1 + 0.5 * (1 - pt);
-    ctx.save(); ctx.translate(x0 - 50, y + sz / 2); ctx.scale(k, k); chalkText('×' + s.streak, 0, 0, 15); ctx.restore();
-  }
+  if (s.dir && run){ ctx.fillStyle = '#3b3d44'; const ax = s.dir > 0 ? x0 + (V - 1) * gap + 12 : x0 - 12; ctx.beginPath(); ctx.moveTo(ax + s.dir * 5, y); ctx.lineTo(ax - s.dir * 3, y - 5); ctx.lineTo(ax - s.dir * 3, y + 5); ctx.fill(); }
+  if (s.streak > 1){ const pt = G.streakPop ? clamp((now - G.streakPop) / 240, 0, 1) : 1, k = 1 + 0.4 * (1 - pt);
+    ctx.save(); ctx.translate(x0 - 34, y); ctx.scale(k, k); ctx.fillStyle = '#2d2f36'; ctx.font = '900 13px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('×' + s.streak, 0, 0.5); ctx.restore(); }
 }
-// «Затмение» — латунный жетон на настиле со счётчиком; пульсирует, когда хода нет.
+// «Затмение» — кнопка на корпусе: латунное кольцо, чёрное солнце с короной, число зарядов; пульсирует, когда хода нет.
 function drawWildButton(now, Pg){
-  const s = G.s, B = Pg.wild; if (s.wilds <= 0 && !s.wildTop) return;
+  const s = G.s, B = Pg.wild, have = s.wilds > 0 || s.wildTop, intro = s.li >= 5 || s.wildsEarned || s.wildsUsed;
+  if (!have && !intro) return;
   const can = canWild(s), urge = can && !playable(s).length, pul = urge ? 1 + 0.08 * Math.sin(now / 150) : 1;
-  ctx.save(); ctx.translate(B.x, B.y); ctx.scale(pul, pul);
-  ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(2, 5, B.r, B.r * 0.9, 0, 0, 6.2832); ctx.fill();
+  ctx.save(); ctx.translate(B.x, B.y); ctx.scale(pul, pul); if (!have) ctx.globalAlpha = 0.3;
   const g = ctx.createRadialGradient(-B.r * 0.3, -B.r * 0.4, 2, 0, 0, B.r); g.addColorStop(0, '#f4d58a'); g.addColorStop(0.6, '#b8862e'); g.addColorStop(1, '#6e4a14');
   ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, B.r, 0, 6.2832); ctx.fill();
-  ctx.fillStyle = '#120c18'; ctx.beginPath(); ctx.arc(0, 0, B.r * 0.74, 0, 6.2832); ctx.fill();
-  const sp = IMG['sprite:eclipse']; ctx.rotate(now / 3000);
-  if (sp) ctx.drawImage(sp, -B.r * 0.95, -B.r * 0.95, B.r * 1.9, B.r * 1.9);
+  ctx.fillStyle = '#120c18'; ctx.beginPath(); ctx.arc(0, 0, B.r * 0.76, 0, 6.2832); ctx.fill();
+  const sp = IMG['sprite:eclipse']; ctx.rotate(now / 3000); if (sp) ctx.drawImage(sp, -B.r * 0.95, -B.r * 0.95, B.r * 1.9, B.r * 1.9);
   ctx.restore();
   if (urge){ ctx.strokeStyle = 'rgba(255,214,120,0.9)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(B.x, B.y, B.r + 5 + 3 * Math.abs(Math.sin(now / 200)), 0, 6.2832); ctx.stroke(); }
-  if (s.wilds > 0) chalkText('×' + s.wilds, B.x, B.y - B.r - 10, 14);
+  if (s.wilds > 0){ const bx = B.x + B.r * 0.72, by = B.y - B.r * 0.72; ctx.fillStyle = '#f6d27a'; ctx.beginPath(); ctx.arc(bx, by, 8, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = '#2b1a04'; ctx.font = '900 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(s.wilds), bx, by + 0.5); }
+  ctx.fillStyle = 'rgba(235,236,240,0.85)'; ctx.font = '700 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('затмение', Math.min(B.x, VW - 32), Pg.cy + Pg.lensR + 11);
 }
-// Полёт кадра: приподнялся под пальцем → дуга к стопке с поворотом и упругим ростом → шлёп на стопку.
-// Из плёнки летит первый негатив и проявляется по дороге.
+// Полёт кадра: приподнялся под пальцем → дуга к видоискателю с поворотом и упругим ростом → посадка (сплющивание и шторка).
+// С плёнки кадр летит непроявленным и проявляется по дороге.
 function drawFlights(now){
   const Pg = panelGeom();
   for (let i = G.flights.length - 1; i >= 0; i--){
@@ -1945,20 +1943,19 @@ function drawFlights(now){
       x = (1 - e) * (1 - e) * f.x0 + 2 * (1 - e) * e * mx + e * e * Pg.cx; y = (1 - e) * (1 - e) * (f.y0 - 6) + 2 * (1 - e) * e * my + e * e * Pg.cy;
       w = f.w0 * 1.15 + (Pg.vfW - f.w0 * 1.15) * b; rot = f.rot0 * (1 - e) + f.dir * 0.5 * Math.sin(e * Math.PI) - 0.04 * e; lf = 1 - e; sh = 0.4;
       if (f.fromFilm) dev = clamp(t * 1.4, 0, 1);
-      if (t >= 1){ G.pileHist.unshift(G.vfId); G.pileHist.length = Math.min(G.pileHist.length, 4); G.vfId = f.id; G.land = now; G.flights.splice(i, 1);
-        burst(Pg.cx, Pg.cy + Pg.vfW * 0.5, [250, 240, 220], 8, 0.12); continue; }
+      if (t >= 1){ G.vfId = f.id; G.land = now; G.flights.splice(i, 1); burst(Pg.cx, Pg.cy, [250, 240, 220], 8, 0.12); continue; }
     }
     drawPolaroid(ctx, x, y, w, rot, f.id, dev, { shadow: sh, lift: lf, photoPx: Pg.vfW * 0.85 });
   }
   // кадр шкалы летит со стопки в конец ленты
   for (let i = G.bonusFlights.length - 1; i >= 0; i--){
     const b = G.bonusFlights[i], t = (now - b.t0) / b.dur; if (t < 0) continue;
-    const S = Pg.strip, e = easeInOut(clamp(t, 0, 1)), x0 = b.x0 !== undefined ? b.x0 : Pg.cx, y0 = b.y0 !== undefined ? b.y0 : Pg.cy - 30;
-    const x1 = Math.min(VW - 20, S.x + G.s.stock.length * S.fw - S.fw / 2), y1 = S.y + S.h / 2;
+    const e = easeInOut(clamp(t, 0, 1)), x0 = b.x0 !== undefined ? b.x0 : Pg.cx, y0 = b.y0 !== undefined ? b.y0 : Pg.cy - 30;
+    const x1 = Pg.filmC.x, y1 = Pg.filmC.y - 10;
     const x = x0 + (x1 - x0) * e, y = y0 + (y1 - y0) * e - Math.sin(e * Math.PI) * 60;
-    ctx.drawImage(negative(S.fw * scale * DPR), x - S.fw / 2, y - S.fw / 2, S.fw, S.fw);
+    drawPolaroid(ctx, x, y, 22 * (1 - 0.3 * e), e * 6, null, 0, { shadow: 0.3 });
     if (fxRnd() < 0.6) G.parts.push({ kind: 'spark', x, y, vx: 0, vy: 0.02, g: 0, t0: now, life: 380, size: 2, col: [255, 214, 120] });
-    if (t >= 1){ G.bonusFlights.splice(i, 1); G.filmBump = now; floatText('+1 кадр', x1, S.y - 10); burst(x1, y1, [255, 214, 120], 10, 0.18); }
+    if (t >= 1){ G.bonusFlights.splice(i, 1); G.filmBump = now; floatText('+1 кадр', x1 + 10, Pg.by - 8); burst(x1, y1, [255, 214, 120], 10, 0.18); }
   }
 }
 function drawParts(now){
@@ -1991,7 +1988,7 @@ function hintTarget(now){
 function drawHint(now){
   const tgt = hintTarget(now); if (tgt === null) return;
   let x, y; const Pg = panelGeom();
-  if (tgt === 'film'){ x = Pg.strip.x + Pg.strip.fw * 0.6; y = Pg.strip.y + Pg.strip.h / 2; }
+  if (tgt === 'film'){ x = Pg.filmC.x; y = Pg.filmC.y - 6; }
   else if (tgt === 'wild'){ x = Pg.wild.x; y = Pg.wild.y; }
   else { const T = tileGeom(tgt); x = T.x; y = T.y; }
   // нажатие: рука подъезжает к цели и «жмёт» (сжимается), в момент касания расходится кольцо
