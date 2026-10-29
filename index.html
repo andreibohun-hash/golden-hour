@@ -116,9 +116,9 @@ const CFG = {
   ROW_STEP: 0.6,          // шаг ряда в высотах полароида (перекрытие пиков)
   TILE_ROT_DEG: 4,        // разброс наклона полароидов, ±градусов
   HORIZON_FRAC: 0.22,     // горизонт залива — доля высоты экрана (небо — полоса сверху, остальное — поле на воде)
-  PANEL_H: 150,           // высота фотоаппарата внизу (плёнка, видоискатель, объективы-соседи, шкала, затмение)
-  VF_W: 84,               // сторона кадра в видоискателе
-  THUMB_W: 60,            // диаметр объективов с соседними временами
+  PANEL_H: 182,           // высота нижней панели (плёнка, видоискатель, соседи, шкала)
+  VF_W: 96,               // ширина полароида в видоискателе
+  THUMB_W: 46,            // ширина полароидов соседних времён
   // --- эффекты (мс, абсолютное время) ---
   WORLD_MS: 400,          // мир переходит в новое время
   LIFT_MS: 90,            // кадр приподнимается под пальцем перед полётом
@@ -1577,7 +1577,7 @@ function tapFilm(){
   if (wasRainbow) G.rainbowFx = { on: false, t0: now };
   G.runLog = []; G.pipPop = {};
   const Pg = panelGeom();
-  G.flights.push({ id, x0: Pg.filmC.x, y0: Pg.filmC.y - 10, w0: 30, rot0: -0.2, t0: now, dur: CFG.FLIGHT_MS / G.timeScale, dir: 1, fromFilm: true });
+  G.flights.push({ id, x0: Pg.film.x + Pg.film.w / 2, y0: Pg.film.y + Pg.film.h / 2, w0: 30, rot0: -0.2, t0: now, dur: CFG.FLIGHT_MS / G.timeScale, dir: 1, fromFilm: true });
   fxStart('flight', CFG.FLIGHT_MS, id);
   if (wasWild) G.eclipse = { on: false, t0: now };
   lightTo(id, 0); Snd.setTime(id); Snd.film(); G.filmBump = now;
@@ -1812,122 +1812,113 @@ function drawField(now){
       mark: s.flash[k] ? 'flash' : s.rain[k] ? 'rain' : null, now });
   }
 }
-// Низ экрана — фотоаппарат (Андрей 29.10 после теста на телефоне: пирс занимал много места и читался хуже; «на фотик, но понятный»).
-// Компактный корпус во всю ширину: в центре видоискатель с текущим кадром, по бокам два «объектива» с соседними временами
-// и подписями «раньше» / «позже», слева счётчик плёнки (тап — добор), справа кнопка «Затмения», на верхней панели —
-// лампочки шкалы направления и счётчик серии.
+// Нижняя панель — вариант v2.1, который Андрей вернул 30.10 («фотик ужасный, давай вернём вот так»): полупрозрачная плашка,
+// слева кассета со счётчиком, в центре текущий кадр в рамке видоискателя, по бокам соседние времена со стрелками, под ним — шкала направления.
 function panelGeom(){
-  const top = H - CFG.PANEL_H, by = top + 10, bh = H - 6 - by, cy = by + 26 + (bh - 26) / 2 - 8, cx = VW / 2, vfW = CFG.VF_W;
-  return { top, by, bh, cx, cy, vfW, lensR: CFG.THUMB_W / 2, prevX: cx - 86, nextX: cx + 86,
-    filmC: { x: 33, y: cy }, film: { x: 6, y: by, w: 54, h: bh },
-    plateY: by + 12, wild: { x: VW - 36, y: cy - 6, r: 22 } };
-}
-// Корпус рисуется один раз в отдельный холст (кожзам с точками, хромированная верхняя панель, винты) — дальше только копия.
-let CAMERA_CACHE = null;
-function cameraBody(Pg){
-  const key = W + 'x' + H + ':' + DPR + ':' + scale;
-  if (CAMERA_CACHE && CAMERA_CACHE.key === key) return CAMERA_CACHE.c;
-  const c = document.createElement('canvas'); c.width = Math.round(VW * scale * DPR); c.height = Math.round((Pg.bh + 12) * scale * DPR);
-  const x = c.getContext('2d'); x.scale(scale * DPR, scale * DPR);
-  const w = VW - 12, h = Pg.bh;
-  x.fillStyle = 'rgba(0,0,0,0.35)'; rr(x, 8, 6, w, h, 20); x.fill();
-  const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#34343c'); g.addColorStop(1, '#1d1d22');
-  x.fillStyle = g; rr(x, 6, 2, w, h, 20); x.fill();
-  // кожзам: мелкие светлые точки
-  const rnd = mulberry32(55); x.fillStyle = 'rgba(255,255,255,0.05)';
-  for (let i = 0; i < 900; i++) x.fillRect(10 + rnd() * (w - 8), 26 + rnd() * (h - 30), 1.2, 1.2);
-  // хромированная верхняя панель
-  const pg = x.createLinearGradient(0, 2, 0, 26); pg.addColorStop(0, '#f1f2f5'); pg.addColorStop(0.5, '#c9cbd2'); pg.addColorStop(1, '#9fa2ab');
-  x.fillStyle = pg; x.save(); rr(x, 6, 2, w, h, 20); x.clip(); x.fillRect(6, 2, w, 24); x.restore();
-  x.fillStyle = 'rgba(0,0,0,0.25)'; x.fillRect(12, 26, w - 12, 1.5);
-  for (const sx of [18, VW - 18]){ x.fillStyle = '#8b8e96'; x.beginPath(); x.arc(sx, 14, 3, 0, 6.2832); x.fill(); x.strokeStyle = '#5c5f66'; x.lineWidth = 1; x.beginPath(); x.moveTo(sx - 2, 14); x.lineTo(sx + 2, 14); x.stroke(); }
-  CAMERA_CACHE = { key, c };
-  return c;
+  const top = H - CFG.PANEL_H, cy = H - 108, vfW = CFG.VF_W, cx = 228;
+  return { top, cy, cx, vfW, prevX: 144, nextX: 312, thW: CFG.THUMB_W,
+    film: { x: 10, y: cy - 66, w: 84, h: 124 }, wild: { x: 366, y: cy - 34, r: 21 }, stripY: H - 28 };
 }
 function drawPanel(now){
   const s = G.s, Pg = panelGeom();
-  ctx.drawImage(cameraBody(Pg), 0, Pg.by - 2, VW, Pg.bh + 12);
+  const pg = ctx.createLinearGradient(0, Pg.top, 0, H); pg.addColorStop(0, 'rgba(10,12,26,0.42)'); pg.addColorStop(1, 'rgba(10,12,26,0.62)');
+  ctx.fillStyle = pg; rr(ctx, 6, Pg.top + 6, VW - 12, H - Pg.top - 12, 22); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1; rr(ctx, 6.5, Pg.top + 6.5, VW - 13, H - Pg.top - 13, 22); ctx.stroke();
   drawFilm(now, Pg);
+  // соседи текущего времени (правда ядра), подсвечиваются после ошибки; на «Затмении» и радуге подходит любой кадр
+  if (s.wildTop){
+    ctx.fillStyle = 'rgba(255,226,160,0.9)'; ctx.font = '700 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('любой', Pg.prevX, Pg.cy + 4); ctx.fillText('любой', Pg.nextX, Pg.cy + 4);
+  } else {
+    const V = s.V, prevId = s.ids[(s.top - 1 + V) % V], nextId = s.ids[(s.top + 1) % V];
+    const hp = G.hintPulse ? clamp(1 - (now - G.hintPulse) / 900, 0, 1) : 0, pul = 1 + 0.14 * hp * Math.abs(Math.sin((now - G.hintPulse) / 90));
+    const ring = hp > 0 ? 'rgba(255,214,120,' + (0.4 + 0.6 * hp).toFixed(2) + ')' : null;
+    drawPolaroid(ctx, Pg.prevX, Pg.cy + 4, Pg.thW, -0.07, prevId, 1, { scale: pul, ring });
+    drawPolaroid(ctx, Pg.nextX, Pg.cy + 4, Pg.thW, 0.07, nextId, 1, { scale: pul, ring });
+    drawChevron(Pg.prevX + Pg.thW / 2 + 9, Pg.cy + 4, -1); drawChevron(Pg.nextX - Pg.thW / 2 - 9, Pg.cy + 4, 1);
+  }
+  // видоискатель: при посадке кадра — сплющивание и шторка затвора
+  const vh = Pg.vfW * CFG.POLA_RATIO, lt = G.land ? clamp((now - G.land) / (CFG.LAND_MS / G.timeScale), 0, 1) : 1;
+  const sq = lt < 1 ? Math.sin(lt * Math.PI) * (1 - lt) : 0;
+  drawPolaroid(ctx, Pg.cx, Pg.cy, Pg.vfW, 0, G.vfId, 1, { shadow: 0.35, sx: 1 + 0.1 * sq, sy: 1 - 0.08 * sq });
+  if (lt < 1){
+    const m = Pg.vfW * 0.05, ps = Pg.vfW - 2 * m, px = Pg.cx - Pg.vfW / 2 + m, py = Pg.cy - vh / 2 + m, r = ps * 0.75 * easeOut(lt);
+    ctx.save(); ctx.beginPath(); ctx.rect(px, py, ps, ps); ctx.arc(px + ps / 2, py + ps / 2, Math.max(0.1, r), 0, 6.2832, true);
+    ctx.fillStyle = 'rgba(8,8,14,' + (0.9 * (1 - lt)).toFixed(3) + ')'; ctx.fill('evenodd'); ctx.restore();
+  }
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 2.5;
+  const bx = Pg.vfW / 2 + 7, by = vh / 2 + 7, L = 12;
+  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]){
+    ctx.beginPath(); ctx.moveTo(Pg.cx + sx * bx, Pg.cy + sy * by - sy * L); ctx.lineTo(Pg.cx + sx * bx, Pg.cy + sy * by); ctx.lineTo(Pg.cx + sx * bx - sx * L, Pg.cy + sy * by); ctx.stroke();
+  }
   drawGauge(now, Pg);
-  // объективы: соседние времена; после ошибки подсвечиваются золотом
-  const hp = G.hintPulse ? clamp(1 - (now - G.hintPulse) / 900, 0, 1) : 0, pul = 1 + 0.1 * hp * Math.abs(Math.sin((now - G.hintPulse) / 90));
-  const V = s.V, prevId = s.ids[(s.top - 1 + V) % V], nextId = s.ids[(s.top + 1) % V];
-  drawLens(Pg.prevX, Pg.cy, Pg.lensR * pul, s.wildTop ? null : prevId, hp);
-  drawLens(Pg.nextX, Pg.cy, Pg.lensR * pul, s.wildTop ? null : nextId, hp);
-  const lab = (t, x) => { ctx.fillStyle = 'rgba(235,236,240,0.85)'; ctx.font = '700 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(t, x, Pg.cy + Pg.lensR + 11); };
-  lab(s.wildTop ? 'любой' : '‹ раньше', Pg.prevX); lab(s.wildTop ? 'любой' : 'позже ›', Pg.nextX);
-  // видоискатель: рамка и текущий кадр; при посадке — сплющивание и шторка
-  const v = Pg.vfW, lt = G.land ? clamp((now - G.land) / (CFG.LAND_MS / G.timeScale), 0, 1) : 1, sq = lt < 1 ? Math.sin(lt * Math.PI) * (1 - lt) : 0;
-  ctx.save(); ctx.translate(Pg.cx, Pg.cy); ctx.scale(1 + 0.06 * sq, 1 - 0.05 * sq);
-  ctx.fillStyle = '#0c0c10'; rr(ctx, -v / 2 - 7, -v / 2 - 7, v + 14, v + 14, 10); ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1.5; rr(ctx, -v / 2 - 7, -v / 2 - 7, v + 14, v + 14, 10); ctx.stroke();
-  ctx.drawImage(photo(G.vfId, v * scale * DPR), -v / 2, -v / 2, v, v);
-  if (lt < 1){ ctx.beginPath(); ctx.rect(-v / 2, -v / 2, v, v); ctx.arc(0, 0, Math.max(0.1, v * 0.75 * easeOut(lt)), 0, 6.2832, true); ctx.fillStyle = 'rgba(8,8,14,' + (0.9 * (1 - lt)).toFixed(3) + ')'; ctx.fill('evenodd'); }
-  ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 2;
-  const L = 10, e = v / 2 - 4;
-  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]){ ctx.beginPath(); ctx.moveTo(sx * e, sy * e - sy * L); ctx.lineTo(sx * e, sy * e); ctx.lineTo(sx * e - sx * L, sy * e); ctx.stroke(); }
-  ctx.restore();
   drawWildButton(now, Pg);
 }
-// Объектив: хромированное кольцо, внутри — фото времени (круг); на «Затмении» и радуге — пустое тёмное стекло.
-function drawLens(x, y, r, id, glow){
-  const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.4, 2, x, y, r + 6); g.addColorStop(0, '#f4f5f8'); g.addColorStop(1, '#7d8089');
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r + 5, 0, 6.2832); ctx.fill();
-  ctx.fillStyle = '#0b0b10'; ctx.beginPath(); ctx.arc(x, y, r + 1, 0, 6.2832); ctx.fill();
-  if (id){ ctx.save(); ctx.beginPath(); ctx.arc(x, y, r - 1, 0, 6.2832); ctx.clip(); ctx.drawImage(photo(id, 2 * r * scale * DPR), x - r, y - r, 2 * r, 2 * r); ctx.restore(); }
-  const gl = ctx.createLinearGradient(x - r, y - r, x + r, y + r); gl.addColorStop(0, 'rgba(255,255,255,0.28)'); gl.addColorStop(0.45, 'rgba(255,255,255,0)');
-  ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(x, y, r - 1, 0, 6.2832); ctx.fill();
-  if (glow > 0){ ctx.strokeStyle = 'rgba(255,214,120,' + (0.4 + 0.6 * glow).toFixed(2) + ')'; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.arc(x, y, r + 6, 0, 6.2832); ctx.stroke(); }
+function drawChevron(x, y, dir){
+  ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 2.5; ctx.beginPath();
+  ctx.moveTo(x - dir * 4, y - 7); ctx.lineTo(x + dir * 4, y); ctx.lineTo(x - dir * 4, y + 7); ctx.stroke();
 }
 function chalkText(t, x, y, size){
   ctx.save(); ctx.font = '700 ' + size + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillStyle = 'rgba(250,246,236,0.95)'; ctx.fillText(t, x, y); ctx.restore();
 }
-// Плёнка: кассета (спрайт GPT) и крупное число кадров на корпусе, подпись «плёнка»; светится, когда хода нет; тап — добор.
+// Плёнка: кассета (спрайт GPT) со счётчиком на этикетке; пульсирует, когда на столе нет хода; подпрыгивает, когда кадр добавился.
 function drawFilm(now, Pg){
-  const s = G.s, n = s.stock.length, noMove = !playable(s).length && n > 0, C = Pg.filmC;
-  let dx = 0, bump = 1;
+  const s = G.s, F = Pg.film, n = s.stock.length, noMove = !playable(s).length && n > 0;
+  let sc = 1, dx = 0, rot = 0;
+  if (noMove){ sc = 1 + 0.05 * Math.abs(Math.sin(now / 260)); rot = Math.sin(now / 130) * 0.04; }
   if (G.filmShake){ const t = (now - G.filmShake) / 320; if (t < 1) dx = Math.sin(t * 28) * 3 * (1 - t); else G.filmShake = 0; }
-  if (G.filmBump){ const t = (now - G.filmBump) / 380; if (t < 1) bump = 1 + 0.14 * Math.sin(t * Math.PI) * (1 - t * 0.5); else G.filmBump = 0; }
-  if (noMove){ const gl = 0.5 + 0.5 * Math.abs(Math.sin(now / 260)); ctx.strokeStyle = 'rgba(255,214,120,' + gl.toFixed(2) + ')'; ctx.lineWidth = 3; rr(ctx, Pg.film.x + 4, Pg.by + 30, Pg.film.w - 6, Pg.cy + Pg.lensR + 20 - Pg.by - 30, 12); ctx.stroke(); }
-  ctx.save(); ctx.translate(C.x + dx, C.y - 10); ctx.scale(bump, bump); if (noMove) ctx.rotate(Math.sin(now / 130) * 0.05);
+  if (G.filmBump){ const t = (now - G.filmBump) / 380; if (t < 1) sc *= 1 + 0.16 * Math.sin(t * Math.PI) * (1 - t * 0.5); else G.filmBump = 0; }
+  ctx.save(); ctx.translate(F.x + F.w / 2 + dx, F.y + F.h / 2); ctx.rotate(rot); ctx.scale(sc, sc);
+  if (noMove){ ctx.strokeStyle = 'rgba(255,214,120,' + (0.5 + 0.5 * Math.abs(Math.sin(now / 260))).toFixed(2) + ')'; ctx.lineWidth = 3; rr(ctx, -F.w / 2 - 4, -F.h / 2 - 4, F.w + 8, F.h + 8, 16); ctx.stroke(); }
   const sp = IMG['sprite:film'];
-  if (sp){ if (!n) ctx.globalAlpha = 0.45; ctx.drawImage(sp, 0, 0, sp.width * 0.72, sp.height, -19, -27, 38, 52); ctx.globalAlpha = 1; }
-  ctx.fillStyle = n ? '#2b1a04' : '#6b6358'; ctx.font = '900 17px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(n), -5, 1);
-  ctx.restore();
-  ctx.fillStyle = 'rgba(235,236,240,0.85)'; ctx.font = '700 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('плёнка', C.x, Pg.cy + Pg.lensR + 11);
-}
-// Шкала направления — лампочки на хромированной панели: горят цветом времени хода; на полкруга и в конце — значки наград.
-function drawGauge(now, Pg){
-  const s = G.s, V = s.V, half = gaugeHalf(s), gap = 15, x0 = Pg.cx - (V - 1) * gap / 2, y = Pg.plateY, run = s.dirRun;
-  for (let i = 0; i < V; i++){
-    const x = x0 + i * gap, lit = i < run && G.runLog[i], pt = G.pipPop[i] !== undefined ? clamp((now - G.pipPop[i]) / 260, 0, 1) : 1, r = 5 * (1 + 0.5 * Math.sin(pt * Math.PI) * (1 - pt));
-    if (lit){ const c = hex(LIGHT[G.runLog[i]].mid); const gg = ctx.createRadialGradient(x, y, 0, x, y, r * 2.2); gg.addColorStop(0, rgba(c, 0.9)); gg.addColorStop(1, rgba(c, 0)); ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(x, y, r * 2.2, 0, 6.2832); ctx.fill(); ctx.fillStyle = rgba(mixC(c, [255, 255, 255], 0.35)); }
-    else ctx.fillStyle = '#5d6068';
-    ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1; ctx.stroke();
-    if (i === half - 1 || i === V - 1){ const ic = i === V - 1 ? IMG['sprite:eclipse'] : IMG['sprite:film']; if (ic && !lit) ctx.drawImage(ic, x - 4, y - 4, 8, 8); }
+  if (sp){
+    if (!n) ctx.globalAlpha = 0.45;
+    const sz = F.h * 1.08; ctx.drawImage(sp, -sz / 2 + 4, -sz / 2, sz, sz); ctx.globalAlpha = 1;
+    ctx.fillStyle = n ? '#2b1a04' : '#5b5348'; ctx.font = '900 24px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(String(n), -2, F.h * 0.1);
+  } else {
+    ctx.fillStyle = n ? '#1d1d22' : '#4a4850'; rr(ctx, -F.w / 2, -F.h / 2 + 8, F.w - 14, F.h - 16, 10); ctx.fill();
+    ctx.fillStyle = n ? '#f2b632' : '#8d8577'; rr(ctx, -F.w / 2 + 6, -12, F.w - 26, 34, 6); ctx.fill();
+    ctx.fillStyle = '#2b1a04'; ctx.font = '800 22px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(n), -7, 6);
   }
-  if (s.dir && run){ ctx.fillStyle = '#3b3d44'; const ax = s.dir > 0 ? x0 + (V - 1) * gap + 12 : x0 - 12; ctx.beginPath(); ctx.moveTo(ax + s.dir * 5, y); ctx.lineTo(ax - s.dir * 3, y - 5); ctx.lineTo(ax - s.dir * 3, y + 5); ctx.fill(); }
-  if (s.streak > 1){ const pt = G.streakPop ? clamp((now - G.streakPop) / 240, 0, 1) : 1, k = 1 + 0.4 * (1 - pt);
-    ctx.save(); ctx.translate(x0 - 34, y); ctx.scale(k, k); ctx.fillStyle = '#2d2f36'; ctx.font = '900 13px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('×' + s.streak, 0, 0.5); ctx.restore(); }
-}
-// «Затмение» — кнопка на корпусе: латунное кольцо, чёрное солнце с короной, число зарядов; пульсирует, когда хода нет.
-function drawWildButton(now, Pg){
-  const s = G.s, B = Pg.wild, have = s.wilds > 0 || s.wildTop, intro = s.li >= 5 || s.wildsEarned || s.wildsUsed;
-  if (!have && !intro) return;
-  const can = canWild(s), urge = can && !playable(s).length, pul = urge ? 1 + 0.08 * Math.sin(now / 150) : 1;
-  ctx.save(); ctx.translate(B.x, B.y); ctx.scale(pul, pul); if (!have) ctx.globalAlpha = 0.3;
-  const g = ctx.createRadialGradient(-B.r * 0.3, -B.r * 0.4, 2, 0, 0, B.r); g.addColorStop(0, '#f4d58a'); g.addColorStop(0.6, '#b8862e'); g.addColorStop(1, '#6e4a14');
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, B.r, 0, 6.2832); ctx.fill();
-  ctx.fillStyle = '#120c18'; ctx.beginPath(); ctx.arc(0, 0, B.r * 0.76, 0, 6.2832); ctx.fill();
-  const sp = IMG['sprite:eclipse']; ctx.rotate(now / 3000); if (sp) ctx.drawImage(sp, -B.r * 0.95, -B.r * 0.95, B.r * 1.9, B.r * 1.9);
   ctx.restore();
-  if (urge){ ctx.strokeStyle = 'rgba(255,214,120,0.9)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(B.x, B.y, B.r + 5 + 3 * Math.abs(Math.sin(now / 200)), 0, 6.2832); ctx.stroke(); }
-  if (s.wilds > 0){ const bx = B.x + B.r * 0.72, by = B.y - B.r * 0.72; ctx.fillStyle = '#f6d27a'; ctx.beginPath(); ctx.arc(bx, by, 8, 0, 6.2832); ctx.fill();
-    ctx.fillStyle = '#2b1a04'; ctx.font = '900 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(s.wilds), bx, by + 0.5); }
-  ctx.fillStyle = 'rgba(235,236,240,0.85)'; ctx.font = '700 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('затмение', Math.min(B.x, VW - 32), Pg.cy + Pg.lensR + 11);
+}
+// Шкала направления: V ячеек под видоискателем. Ход в ту же сторону кладёт мини-кадр в следующую ячейку;
+// на полкруга — значок плёнки (кадр на плёнку), в конце — затмение («Полный день»). Разворот начинает шкалу заново.
+function drawGauge(now, Pg){
+  const s = G.s, V = s.V, half = gaugeHalf(s), sz = Math.min(13, 150 / V), gap = 3, w = V * (sz + gap) - gap, x0 = Pg.cx - w / 2, y = Pg.stripY - sz / 2;
+  const run = s.dirRun;
+  for (let i = 0; i < V; i++){
+    const x = x0 + i * (sz + gap);
+    if (i < run && G.runLog[i]){
+      const pt = G.pipPop[i] !== undefined ? clamp((now - G.pipPop[i]) / 260, 0, 1) : 1, ps = sz * (1 + 0.45 * Math.sin(pt * Math.PI) * (1 - pt));
+      ctx.drawImage(photo(G.runLog[i], sz * scale * DPR), x + sz / 2 - ps / 2, y + sz / 2 - ps / 2, ps, ps);
+    } else { ctx.strokeStyle = 'rgba(255,255,255,0.32)'; ctx.lineWidth = 1.2; rr(ctx, x + 0.5, y + 0.5, sz - 1, sz - 1, 3); ctx.stroke(); }
+    if (i === half - 1 || i === V - 1){
+      const ic = i === V - 1 ? IMG['sprite:eclipse'] : IMG['sprite:film'], isz = sz * 0.95;
+      if (ic) ctx.drawImage(ic, x + sz / 2 - isz / 2, y - isz - 1, isz, isz);
+    }
+  }
+  if (s.dir && run){ ctx.fillStyle = 'rgba(255,214,120,0.95)'; ctx.beginPath(); const ax = s.dir > 0 ? x0 + w + 8 : x0 - 8; ctx.moveTo(ax + s.dir * 5, y + sz / 2); ctx.lineTo(ax - s.dir * 3, y + sz / 2 - 5); ctx.lineTo(ax - s.dir * 3, y + sz / 2 + 5); ctx.fill(); }
+  if (s.streak > 1){
+    const pt = G.streakPop ? clamp((now - G.streakPop) / 240, 0, 1) : 1, k = 1 + 0.5 * (1 - pt);
+    ctx.save(); ctx.translate(x0 + w + (s.dir > 0 ? 30 : 22), y + sz / 2); ctx.scale(k, k);
+    ctx.fillStyle = s.streak >= 6 ? '#ffd27a' : '#fff'; ctx.font = '800 13px system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText('×' + s.streak, 0, 0); ctx.restore();
+  }
+}
+function drawWildButton(now, Pg){
+  const s = G.s, B = Pg.wild; if (s.wilds <= 0 && !s.wildTop) return;
+  const can = canWild(s), urge = can && !playable(s).length, pul = urge ? 1 + 0.08 * Math.sin(now / 150) : 1;
+  ctx.save(); ctx.translate(B.x, B.y); ctx.scale(pul, pul);
+  if (urge){ ctx.strokeStyle = 'rgba(255,214,120,0.9)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, B.r + 5 + 3 * Math.abs(Math.sin(now / 200)), 0, 6.2832); ctx.stroke(); }
+  ctx.fillStyle = 'rgba(8,8,18,0.7)'; ctx.beginPath(); ctx.arc(0, 0, B.r, 0, 6.2832); ctx.fill();
+  const sp = IMG['sprite:eclipse']; ctx.rotate(now / 3000);
+  if (sp) ctx.drawImage(sp, -B.r * 1.25, -B.r * 1.25, B.r * 2.5, B.r * 2.5);
+  ctx.restore();
+  if (s.wilds > 0){ ctx.fillStyle = '#f2b632'; ctx.beginPath(); ctx.arc(B.x + B.r * 0.8, B.y - B.r * 0.8, 9, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = '#2b1a04'; ctx.font = '900 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(s.wilds), B.x + B.r * 0.8, B.y - B.r * 0.8 + 0.5); }
 }
 // Полёт кадра: приподнялся под пальцем → дуга к видоискателю с поворотом и упругим ростом → посадка (сплющивание и шторка).
 // С плёнки кадр летит непроявленным и проявляется по дороге.
@@ -1941,7 +1932,7 @@ function drawFlights(now){
       const t = clamp((el - lift) / (f.dur - lift), 0, 1), e = easeInOut(t), b = easeOutBack(t);
       const mx = (f.x0 + Pg.cx) / 2 + f.dir * 30, my = Math.min(f.y0, Pg.cy) - 70;
       x = (1 - e) * (1 - e) * f.x0 + 2 * (1 - e) * e * mx + e * e * Pg.cx; y = (1 - e) * (1 - e) * (f.y0 - 6) + 2 * (1 - e) * e * my + e * e * Pg.cy;
-      w = f.w0 * 1.15 + (Pg.vfW - f.w0 * 1.15) * b; rot = f.rot0 * (1 - e) + f.dir * 0.5 * Math.sin(e * Math.PI) - 0.04 * e; lf = 1 - e; sh = 0.4;
+      w = f.w0 * 1.15 + (Pg.vfW - f.w0 * 1.15) * b; rot = f.rot0 * (1 - e) + f.dir * 0.5 * Math.sin(e * Math.PI); lf = 1 - e; sh = 0.4;
       if (f.fromFilm) dev = clamp(t * 1.4, 0, 1);
       if (t >= 1){ G.vfId = f.id; G.land = now; G.flights.splice(i, 1); burst(Pg.cx, Pg.cy, [250, 240, 220], 8, 0.12); continue; }
     }
@@ -1951,11 +1942,11 @@ function drawFlights(now){
   for (let i = G.bonusFlights.length - 1; i >= 0; i--){
     const b = G.bonusFlights[i], t = (now - b.t0) / b.dur; if (t < 0) continue;
     const e = easeInOut(clamp(t, 0, 1)), x0 = b.x0 !== undefined ? b.x0 : Pg.cx, y0 = b.y0 !== undefined ? b.y0 : Pg.cy - 30;
-    const x1 = Pg.filmC.x, y1 = Pg.filmC.y - 10;
+    const F = Pg.film, x1 = F.x + F.w / 2, y1 = F.y + F.h / 2;
     const x = x0 + (x1 - x0) * e, y = y0 + (y1 - y0) * e - Math.sin(e * Math.PI) * 60;
     drawPolaroid(ctx, x, y, 22 * (1 - 0.3 * e), e * 6, null, 0, { shadow: 0.3 });
     if (fxRnd() < 0.6) G.parts.push({ kind: 'spark', x, y, vx: 0, vy: 0.02, g: 0, t0: now, life: 380, size: 2, col: [255, 214, 120] });
-    if (t >= 1){ G.bonusFlights.splice(i, 1); G.filmBump = now; floatText('+1 кадр', x1 + 10, Pg.by - 8); burst(x1, y1, [255, 214, 120], 10, 0.18); }
+    if (t >= 1){ G.bonusFlights.splice(i, 1); G.filmBump = now; floatText('+1 кадр', x1 + 10, F.y - 6); burst(x1, y1, [255, 214, 120], 10, 0.18); }
   }
 }
 function drawParts(now){
@@ -1988,7 +1979,7 @@ function hintTarget(now){
 function drawHint(now){
   const tgt = hintTarget(now); if (tgt === null) return;
   let x, y; const Pg = panelGeom();
-  if (tgt === 'film'){ x = Pg.filmC.x; y = Pg.filmC.y - 6; }
+  if (tgt === 'film'){ const F = Pg.film; x = F.x + F.w / 2 - 6; y = F.y + F.h / 2; }
   else if (tgt === 'wild'){ x = Pg.wild.x; y = Pg.wild.y; }
   else { const T = tileGeom(tgt); x = T.x; y = T.y; }
   // нажатие: рука подъезжает к цели и «жмёт» (сжимается), в момент касания расходится кольцо
