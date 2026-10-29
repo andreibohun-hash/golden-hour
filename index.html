@@ -1,0 +1,2120 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Золотой час</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#d88a2a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+/* Палитра UI — одно место. Свет мира (небо, вода, город) — таблица LIGHT в скрипте: он меняется каждым ходом. */
+:root{
+  --page:#0d0e14; --ink:#ffffff; --pill:rgba(12,14,28,.42);
+  --card:#fbf8f0; --card-ink:#2b2621; --muted:#81786d; --btn:#ebe5d8; --accent:#f2a93b; --accent-ink:#2b1a04;
+  --frame-w:440px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --card:#26232b; --card-ink:#f4efe6; --muted:#a69d91; --btn:#3a3640; }
+}
+:root[data-theme="dark"]{ --card:#26232b; --card-ink:#f4efe6; --muted:#a69d91; --btn:#3a3640; }
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--page);color:var(--ink);font:16px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif;
+  overflow:hidden;overscroll-behavior:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+#frame{position:relative;width:min(100vw,var(--frame-w));height:100dvh;height:100svh;margin:0 auto;background:#d88a2a;overflow:hidden;
+  display:flex;flex-direction:column;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+#game{flex:1;position:relative;touch-action:none}
+#game canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+header{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;gap:6px;padding:8px 10px;pointer-events:none;z-index:2}
+header .pill{background:var(--pill);color:#fff;border-radius:999px;padding:7px 12px;font-weight:700;font-size:14px;white-space:nowrap}
+header .sp{flex:1}
+header button{pointer-events:auto;background:var(--pill);color:#fff;border:0;border-radius:999px;width:38px;height:38px;padding:0;
+  display:grid;place-items:center;cursor:pointer}
+header svg{width:20px;height:20px;fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+button{font:inherit}
+#overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(6,8,16,.42);padding:18px;z-index:5}
+#overlay.show{display:flex}
+.card{background:var(--card);color:var(--card-ink);border-radius:6px;padding:20px 20px 26px;max-width:350px;width:100%;text-align:center;
+  box-shadow:0 10px 30px rgba(0,0,0,.35);animation:pop .18s ease-out;max-height:92%;overflow:auto} /* стартует с видимого состояния (§9) */
+@keyframes pop{from{transform:scale(.96) rotate(-1deg)}to{transform:scale(1) rotate(0)}}
+.card h2{margin:4px 0 6px;font-size:24px} .card p{color:var(--muted);margin:0 0 14px}
+.card .btn{display:inline-block;border:0;border-radius:12px;padding:11px 18px;margin:4px;background:var(--btn);color:var(--card-ink);cursor:pointer}
+.card .btn.primary{background:var(--accent);color:var(--accent-ink);font-weight:800}
+.card .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:6px 0 12px}
+.card .grid .btn{margin:0;padding:10px 0}
+.card .grid .btn.done{outline:2px solid var(--accent)}
+.card .seg{display:inline-flex;background:var(--btn);border-radius:12px;padding:3px;margin:2px 0 12px}
+.card .seg .btn{margin:0;background:transparent;padding:8px 14px}
+.card .seg .btn.on{background:var(--accent);color:var(--accent-ink);font-weight:800}
+.card table{width:100%;border-collapse:collapse;font-size:13px;margin:4px 0 12px;text-align:left}
+.card td{padding:4px 2px;border-bottom:1px solid rgba(128,120,110,.2)} .card td+td{text-align:right;font-variant-numeric:tabular-nums}
+.card .small{font-size:13px;color:var(--muted)}
+#toast{position:absolute;left:50%;top:58px;transform:translateX(-50%);background:rgba(12,14,28,.72);color:#fff;padding:9px 14px;border-radius:14px;
+  pointer-events:none;opacity:.98;transition:opacity .25s;z-index:4;width:max-content;max-width:86%;text-align:center;font-size:14px;line-height:1.3}
+#toast.hide{opacity:0}
+@media (prefers-reduced-motion: reduce){ .card{animation:none} #toast{transition:none} }
+</style>
+</head>
+<body>
+<div id="frame">
+  <div id="game">
+    <canvas id="cv"></canvas>
+    <header>
+      <span class="pill" id="hud-level">Урок</span>
+      <span class="sp"></span>
+      <button id="btn-reset" aria-label="заново"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4.5h4.5"/></svg></button>
+      <button id="btn-menu" aria-label="меню"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14"/></svg></button>
+      <button id="btn-mute" aria-label="звук"><svg viewBox="0 0 24 24" id="ico-mute"></svg></button>
+    </header>
+  </div>
+  <div id="overlay"><div class="card" id="card"></div></div>
+  <div id="toast" class="hide"></div>
+</div>
+<script>
+'use strict';
+/* ЯДРО */
+// =============================================================================================
+// «Золотой час» — TriPeaks на полароидах одного города. Ранг кадра — время суток, шкала по кругу.
+// Ход: открытый кадр на ступень раньше или позже текущего (после ночи — рассвет). Тот же час ходом не считается.
+// Нет хода — плёнка (колода): её кадр становится текущим, серия рвётся. Победа — сняты все кадры.
+// Плёнка кончилась на почти-победе — «+3 кадра». Это ядро исполняют игра, sim.mjs и test.mjs (core-load.mjs).
+// v2 — развитие, правило совпадения не меняется:
+//   шкала направления — полкруга ходов подряд в одну сторону кладут кадр на плёнку, полный круг («Полный день») даёт «Затмение»;
+//   «Затмение» — к нему подходит любой открытый кадр, серию и шкалу не рвёт;
+//   туча — кадр под ней не берётся, пока в видоискателе не день; фонарь — пока не ночь.
+// =============================================================================================
+const CFG = {
+  // --- правило и баланс ---
+  MODE_DEFAULT: 8,        // шкала глав «8 времён»; переключатель в меню меняет её на 10
+  DECK_10_EXTRA: 4,       // на 10 временах плёнка длиннее на столько кадров: 12–13 → 16–17 (сим брейншторма)
+  EXTRA_N: 3,             // «+3 кадра» на почти-победе
+  EXTRA_MAX: 1,           // сколько раз за уровень
+  NEAR_WIN: 4,            // почти-победа: плёнка пуста, хода нет, на столе осталось не больше стольких кадров
+  GAUGE_ON: true,         // шкала направления (v2); false — правила спайка v1
+  GAUGE_EVERY: 0,         // кадр на плёнку каждые столько ходов подряд в одну сторону; 0 — один раз на полкруга
+  BONUS_POOL: 10,         // запас кадров под награды шкалы, раздаётся вместе с колодой
+  WILD_MAX: 2,            // сколько «Затмений» можно копить
+  // --- механики после 12-го уровня (вводятся по одной: 13, 15, 17, 19, 21) ---
+  STAR_STREAK: 2,         // падающая звезда появляется, когда серия ≥ стольких ходов привела в ночь
+  STAR_MOVES: 3,          // звезда висит столько действий, потом гаснет
+  STAR_FRAMES: 1,         // поймал звезду — столько кадров на плёнку (2 делали игру легче, а выбор мельче — сим depth)
+  STAR_PER_LEVEL: 2,      // звёзд за уровень
+  FLASH_MOVES: 3,         // кадр со вспышкой проявляет все закрытые кадры на столько действий
+  ORDER_NEED: 3,          // заказ: снять столько кадров одного времени
+  ORDER_FRAMES: 1,        // выполненный заказ — столько кадров на плёнку (2 — легче и мельче, сим depth)
+  ORDER_MAX: 2,           // заказов за уровень (второй — после первого)
+  PRIZE_POOL: 12,         // запас кадров под награды звёзд и заказов (своя раздача, колоду уровня не трогает)
+  PLAN_N: 24,             // прогонов на одно решение у бота-планировщика
+  SOLVE_NODES: 300000,    // предел узлов полного перебора в аудите (с открытыми картами)
+  JUICE_STREAK: 4,        // серия такой длины — «сочное событие» для метрики (наравне со снятым пиком и «Полным днём»)
+  // --- раскладка (виртуальные юниты при ширине 400) ---
+  TILE_MAX: 58,           // предельная ширина полароида на столе
+  FIELD_COLS: 8,          // формы не шире стольких кадров: карточка ≈ 45 px на телефоне (10 в ряд давали 35 px — мелко)
+  TILE_GAP: 2.5,          // зазор между соседями в ряду
+  SIDE: 10,               // поле от края кадра
+  POLA_RATIO: 1.16,       // высота полароида / ширина
+  ROW_STEP: 0.6,          // шаг ряда в высотах полароида (перекрытие пиков)
+  TILE_ROT_DEG: 4,        // разброс наклона полароидов, ±градусов
+  HORIZON_FRAC: 0.37,     // горизонт залива — доля высоты экрана
+  PANEL_H: 214,           // высота настила «Пирс» (плёнка, стопка, соседи, шкала)
+  VF_W: 98,               // ширина текущего кадра на стопке
+  THUMB_W: 60,            // ширина соседних времён, выглядывающих из-под стопки
+  // --- эффекты (мс, абсолютное время) ---
+  WORLD_MS: 400,          // мир переходит в новое время
+  LIFT_MS: 90,            // кадр приподнимается под пальцем перед полётом
+  FLIGHT_MS: 340,         // кадр летит в видоискатель (по дуге, с переворотом)
+  LAND_MS: 220,           // приземление в видоискатель: сплющивание и шторка затвора
+  REVEAL_MS: 700,         // открытый кадр проявляется
+  SHAKE_MS: 320,          // неверный кадр вздрагивает
+  FLASH_MS: 300,          // вспышка затвора на снятом пике
+  UNVEIL_MS: 650,         // туча расходится, фонарь загорается
+  BONUS_MS: 520,          // кадр шкалы летит на плёнку
+  ORBIT_DELAY_MS: 380,    // «Полный день»: оборот светил стартует после обычного перехода
+  ORBIT_MS: 1700,         // длительность оборота
+  BANNER_MS: 1500,        // надпись «Полный день»
+  CONFETTI_MS: 1800,      // дождь мини-кадров на «Полном дне» и победе
+  END_DELAY_MS: 900,      // пауза перед экраном победы/поражения
+  TUT_HINT_MS: 2500,      // урок: рука появляется после стольких мс бездействия или сразу после ошибки
+  IDLE_HINT_MS: 7000,     // обычный уровень: подсказка после долгого бездействия
+  INTRO_MS: 3800,         // подсказка о новом элементе в начале уровня
+  TOAST_MS: 1800,
+};
+
+// Детерминированный генератор (PROTO-BASE §5). Math.random() не используется нигде.
+function mulberry32(seed){
+  let a = seed >>> 0;
+  return function(){
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function shuffle(a, rnd){ for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(rnd() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+
+// Времена суток. Шкала главы — список по кругу: после последнего снова первое.
+const TIME_NAMES = { dawn: 'рассвет', morning: 'утро', late: 'позднее утро', noon: 'полдень', day: 'день',
+  golden: 'золотой час', sunset: 'закат', dusk: 'сумерки', night: 'ночь', midnight: 'полночь' };
+const SCALES = {
+  4:  ['morning', 'noon', 'sunset', 'night'],
+  6:  ['dawn', 'morning', 'noon', 'golden', 'sunset', 'night'],
+  8:  ['dawn', 'morning', 'noon', 'day', 'golden', 'sunset', 'dusk', 'night'],
+  10: ['dawn', 'morning', 'late', 'noon', 'day', 'golden', 'sunset', 'dusk', 'night', 'midnight'],
+};
+const DAY_TIMES = ['morning', 'late', 'noon', 'day'];      // в видоискателе день — тучи на открытых кадрах расходятся
+const NIGHT_TIMES = ['dusk', 'night', 'midnight'];         // в видоискателе ночь — фонари загораются
+
+// Раскладки — формы на уровень (§5: контент — данные). Кадр задаётся (x, y, z): x — в ширинах кадра (шаг 0,5),
+// y — в шагах ряда (ряд = 0,6 высоты кадра), z — глубина (больше — лежит сверху).
+// Кадр A закрывает кадр B, если A выше по z и они перекрываются: |dx| < 1 и |dy| ≤ 1.
+// Формы рисуются слоями-строками: символ — полкадра по ширине, строка — шаг ряда, '#' — кадр.
+// dir 'down' — нижние строки лежат сверху (классика пиков), 'up' — верхние сверху; z0/x0/y0 — смещение слоя.
+// peaks: P классических пиков 3-6-9-10; towers — две опоры на настиле.
+const LAYOUTS = {
+  lesson: { name: 'Урок', tiles: [{ x: 1, y: 0, z: 0 }, { x: 0.5, y: 1, z: 1 }, { x: 1.5, y: 1, z: 1 }, { x: 1, y: 2, z: 2 }] },  // ромб из 4
+  peak1: { name: 'Пик', peaks: 1 },                     // 10 кадров, открыто 4
+  peak2: { name: 'Две вершины', peaks: 2 },             // 19
+  peak3: { name: 'Три пика (классика)', peaks: 3, simOnly: true },   // 28, открыто 10 — только для сверки сима с брейнштормом: шире поля
+  peaks3: { name: 'Три пика', layers: [{ dir: 'down', rows: [      // 24: три вершины на общем основании; открыто 7
+    '..#....#....#..',
+    '.#.#..#.#..#.#.',
+    '#.#.#.#.#.#.#.#',
+    '.#.#.#.#.#.#.#.'] }] },
+  bridge: { name: 'Мост', towers: [1.5, 5.5], height: 4 },   // 27: две опоры 1-2-3-4 вплотную, настил из 7 под ними
+  sail: { name: 'Парусник', layers: [{ dir: 'down', rows: [      // 19: косой парус, кливер, корпус; открыто 7
+    '......#........',
+    '......#.#......',
+    '....#.#.#.#....',
+    '...#..#.#.#.#..',
+    '.#.#.#.#.#.#.#.'] }] },
+  diamond: { name: 'Ромб', layers: [                     // 25: пик над перевёрнутым пиком, сверху лежит средний ряд; открыто 5
+    { dir: 'down', rows: ['....#....', '...#.#...', '..#.#.#..', '.#.#.#.#.', '#.#.#.#.#'] },
+    { dir: 'up', y0: 5, rows: ['.#.#.#.#.', '..#.#.#..', '...#.#...', '....#....'] }] },
+  sun: { name: 'Солнце', layers: [{ dir: 'down', rows: [  // 27: диск и 8 свободных лучей; открыто 11
+    '........#.......',
+    '..#...........#.',
+    '......#.#.#.....',
+    '.....#.#.#.#....',
+    '.#..#.#.#.#.#..#',
+    '.....#.#.#.#....',
+    '......#.#.#.....',
+    '..#...........#.',
+    '........#.......'] }] },
+  heart: { name: 'Сердце', layers: [{ dir: 'up', rows: [  // 30: сверху лежат верхушки; открыто 7
+    '..#.#...#.#..',
+    '#.#.#.#.#.#.#',
+    '.#.#.#.#.#.#.',
+    '..#.#.#.#.#..',
+    '...#.#.#.#...',
+    '....#.#.#....',
+    '......#......'] }] },
+  lighthouse: { name: 'Маяк', layers: [{ dir: 'down', rows: [   // 28: фонарь на высокой башне, лучи свободны; открыто 12
+    '.......#.#.#.......',
+    '..#.#...#.#...#.#..',
+    '........#.#........',
+    '........#.#........',
+    '........#.#........',
+    '........#.#........',
+    '.......#.#.#.......',
+    '..#.#.#.#.#.#.#.#..'] }] },
+  crescent: { name: 'Месяц', layers: [{ dir: 'down', rows: [    // 26: серп и две звезды; открыто 9
+    '..........#.#.#....',
+    '.......#.#.#.......',
+    '.....#.#.#.........',
+    '....#.#.#......#...',
+    '....#.#.#..........',
+    '.....#.#.#.......#.',
+    '.......#.#.#.......',
+    '..........#.#.#....'] }] },
+  camera: { name: 'Фотоаппарат', layers: [                // 25: корпус кирпичом, видоискатель сзади, объектив сверху; открыто 7
+    { dir: 'down', rows: ['....#.#........'] },
+    { dir: 'down', z0: 1, y0: 1, rows: ['..#.#.#.#.#.#.#', '...#.#.#.#.#.#.', '..#.#.#.#.#.#.#'] },
+    { dir: 'down', z0: 10, y0: 1.5, rows: ['.......#.#.....', '........#......'] }] },
+  city: { name: 'Город', layers: [{ dir: 'down', rows: [  // 28: дома разной высоты за набережной; открыто 8
+    '...........#.......',
+    '.....#.....#.......',
+    '.....#...#.#...#...',
+    '...#.#...#.#.#.#...',
+    '...#.#.#.#.#.#.#...',
+    '..#.#.#.#.#.#.#.#..'] }] },
+};
+
+// Уровни. scale — сколько времён в главе; на 10-временном режиме главы «8» идут на 10 временах, плёнка + DECK_10_EXTRA.
+// seed / seed10 — сид раздачи (подобран `node sim.mjs tune` под окна побед ботов, см. DESIGN.md).
+// veils — тучи и фонари: сколько и где (open — на открытых с начала, any — на любых; кадры — от сида);
+// wilds — «Затмений» на старте; intro — подсказка о новом. У каждого уровня своя форма.
+const LEVELS = [
+  { n: 1, layout: 'lesson', scale: 8, stock: 1, tutorial: true,
+    script: { tab: ['morning', 'dusk', 'night', 'sunset'], top: 'golden', stock: ['dawn'], extra: [], bonus: [] } },
+  { n: 2,  layout: 'peak1',      scale: 4, stock: 4,  seed: 201 },
+  { n: 3,  layout: 'sail',       scale: 4, stock: 6,  seed: 301, intro: 'gauge' },
+  { n: 4,  layout: 'diamond',    scale: 6, stock: 8,  seed: 407 },
+  { n: 5,  layout: 'peaks3',     scale: 6, stock: 8,  seed: 502 },
+  { n: 6,  layout: 'sun',        scale: 8, stock: 11, seed: 604,  seed10: 6003,  wilds: 1, intro: 'wild' },
+  { n: 7,  layout: 'heart',      scale: 8, stock: 12, seed: 741,  seed10: 7006,  veils: { cloud: 3, where: 'open' }, intro: 'cloud' },
+  { n: 8,  layout: 'bridge',     scale: 8, stock: 13, seed: 822,  seed10: 8001,  veils: { cloud: 4 } },
+  { n: 9,  layout: 'lighthouse', scale: 8, stock: 12, seed: 1076,  seed10: 9020,  veils: { lantern: 3, where: 'open' }, intro: 'lantern' },
+  { n: 10, layout: 'crescent',   scale: 8, stock: 12, seed: 1014,  seed10: 10006, veils: { lantern: 4 } },
+  { n: 11, layout: 'camera',     scale: 8, stock: 11, seed: 1104,  seed10: 11069, veils: { cloud: 2, lantern: 2 } },
+  { n: 12, layout: 'city',       scale: 8, stock: 12, seed: 1236,  seed10: 12036, veils: { cloud: 3, lantern: 3 } },
+];
+
+const LAYOUT_CACHE = {};
+function layoutTiles(D){
+  if (D.tiles) return D.tiles;
+  const tiles = [];
+  if (D.peaks){
+    const P = D.peaks, add = (x, r) => tiles.push({ x, y: r, z: r });
+    for (let p = 0; p < P; p++) add(3 * p + 1.5, 0);
+    for (let p = 0; p < P; p++) for (let k = 0; k < 2; k++) add(3 * p + k + 1, 1);
+    for (let m = 0; m < 3 * P; m++) add(m + 0.5, 2);
+    for (let i = 0; i <= 3 * P; i++) add(i, 3);
+  }
+  if (D.towers){
+    for (let r = 0; r < D.height; r++) for (const c of D.towers) for (let i = 0; i <= r; i++) tiles.push({ x: c - r / 2 + i, y: r, z: r });
+    const minX = Math.min(...tiles.map(t => t.x)), maxX = Math.max(...tiles.map(t => t.x));
+    for (let x = minX + 0.5; x <= maxX - 0.5 + 1e-9; x++) tiles.push({ x, y: D.height, z: D.height });   // настил под опорами
+  }
+  for (const Lr of D.layers || []) Lr.rows.forEach((row, r) => {
+    for (let i = 0; i < row.length; i++) if (row[i] === '#')
+      tiles.push({ x: (Lr.x0 || 0) + i / 2, y: (Lr.y0 || 0) + r, z: (Lr.z0 || 0) + (Lr.dir === 'up' ? Lr.rows.length - 1 - r : r) });
+  });
+  return tiles;
+}
+function buildLayout(name){
+  if (LAYOUT_CACHE[name]) return LAYOUT_CACHE[name];
+  const D = LAYOUTS[name], tiles = layoutTiles(D), n = tiles.length;
+  const minX = Math.min(...tiles.map(t => t.x)), minY = Math.min(...tiles.map(t => t.y));
+  const T = tiles.map(t => ({ x: t.x - minX, y: t.y - minY, z: t.z }));
+  const overlap = (a, b) => Math.abs(a.x - b.x) < 1 && Math.abs(a.y - b.y) <= 1 + 1e-9;
+  const coveredBy = T.map((t, i) => T.map((u, j) => (j !== i && u.z > t.z && overlap(t, u) ? j : -1)).filter(j => j >= 0));
+  const covers = T.map(() => []);
+  coveredBy.forEach((list, i) => list.forEach(j => covers[j].push(i)));
+  // глубина — сколько слоёв над кадром; «вершины» — самые глубокие кадры, их снятие даёт вспышку затвора
+  const depth = new Array(n).fill(-1), dep = (i) => (depth[i] >= 0 ? depth[i] : (depth[i] = coveredBy[i].length ? 1 + Math.max(...coveredBy[i].map(dep)) : 0));
+  for (let i = 0; i < n; i++) dep(i);
+  const maxDepth = Math.max(...depth);
+  const order = [...Array(n).keys()].sort((a, b) => T[a].z - T[b].z || T[a].y - T[b].y || T[a].x - T[b].x);   // порядок отрисовки: сзади вперёд
+  const L = { name, title: D.title || D.name || name, family: D.family || name, n, x: T.map(t => t.x), y: T.map(t => t.y), z: T.map(t => t.z),
+    width: Math.max(...T.map(t => t.x)) + 1, height: Math.max(...T.map(t => t.y)), coveredBy, covers, initCover: coveredBy.map(c => c.length),
+    depth, order, tops: [...Array(n).keys()].filter(i => maxDepth > 0 && depth[i] === maxDepth && !covers[i].length) };
+  return (LAYOUT_CACHE[name] = L);
+}
+// Ошибки формы: два кадра одной глубины не должны перекрываться (непонятно, какой сверху).
+function layoutProblems(name){
+  const L = buildLayout(name), out = [];
+  for (let i = 0; i < L.n; i++) for (let j = i + 1; j < L.n; j++)
+    if (L.z[i] === L.z[j] && Math.abs(L.x[i] - L.x[j]) < 1 && Math.abs(L.y[i] - L.y[j]) <= 1) out.push(i + '/' + j);
+  return out;
+}
+
+// --- Генератор форм для уровней после ручных (13, 14 … 1000 …): у каждого уровня своя форма по сиду ---
+// Форма собирается из примитивов по шаблону, почти всегда симметрично — так формы выглядят нарисованными, а не россыпью.
+// Примитивы (y = 0 — передний нижний ряд, выше — минус; z растёт к переднему ряду):
+//   pyr — пирамида или трапеция (каждый ряд на кадр короче, сдвиг на полкадра); tower — столбики, кадр точно над кадром;
+//   brick — кирпичная кладка; drop — перевёрнутая пирамида, передний ряд сверху; stairs — ступени с ровным правым краем.
+// Шаблоны: «Вершины» (2–3 примитива в ряд), «Пирамида», «Стена», «Корона» (башни на набережной), «Ворота», «Чаша», «Ступени»;
+// поверх может лечь второй ярус (кадры выше по z со сдвигом на полряда), вокруг — свободные кадры-звёзды.
+function prim(kind, w, h){
+  const t = [], add = (x, y, z) => t.push({ x, y, z });
+  for (let k = 0; k < h; k++){
+    if (kind === 'pyr') for (let i = 0; i < w - k; i++) add(k * 0.5 + i, -k, h - 1 - k);
+    if (kind === 'tower') for (let i = 0; i < w; i++) add(i, -k, h - 1 - k);
+    if (kind === 'brick') for (let i = 0; i < w - (k % 2); i++) add((k % 2) * 0.5 + i, -k, h - 1 - k);
+    if (kind === 'drop') for (let i = 0; i < w - k; i++) add(k * 0.5 + i, k, h - 1 - k);
+    if (kind === 'stairs') for (let i = k; i < w; i++) add(i, -k, h - 1 - k);
+  }
+  return t.filter(c => c);
+}
+const GW = 8;   // ширина поля генератора в кадрах (как CFG.FIELD_COLS)
+const place = (tiles, dx, dy, dz, mirror, width) => tiles.map(c => ({ x: (mirror ? width - 1 - c.x : c.x) + dx, y: c.y + (dy || 0), z: c.z + (dz || 0) }));
+const primW = (tiles) => Math.max(...tiles.map(c => c.x)) + 1;
+const GEN_TEMPLATES = [
+  { id: 'peaks', name: 'Вершины', make(r){                  // боковые примитивы зеркально, между ними — средний
+      const kinds = ['pyr', 'tower', 'brick', 'stairs'], side = kinds[Math.floor(r() * 4)], w = 2 + Math.floor(r() * 3);
+      const h = side === 'pyr' || side === 'stairs' ? 2 + Math.floor(r() * (w - 1)) : 2 + Math.floor(r() * 4);
+      const L = prim(side, w, h), gap = 1 + Math.floor(r() * 2), out = place(L, 0, 0, 0);
+      const midW = GW - 2 * w - 2 * gap, mk = ['pyr', 'tower', 'brick', 'drop'][Math.floor(r() * 4)];
+      if (midW >= 1){ const mw = Math.min(midW, 1 + Math.floor(r() * 4)), M = prim(mk, mw, mk === 'pyr' || mk === 'drop' ? mw : 1 + Math.floor(r() * 5)); out.push(...place(M, w + gap + (midW - primW(M)) / 2, 0, 0)); }
+      out.push(...place(L, GW - w, 0, 0, true, w));
+      return out; } },
+  { id: 'castle', name: 'Замок', make(r){                    // кирпичная стена спереди, за ней башни разной высоты
+      const bw = 5 + Math.floor(r() * 3), bh = 2, x0 = (GW - bw) / 2, out = place(prim('brick', bw, bh), x0, 0, 20);
+      const n = 2 + Math.floor(r() * 2), hs = [...Array(n)].map(() => 1 + Math.floor(r() * 4));
+      for (let c = 0; c < n; c++){
+        const x = x0 + c * ((bw - 1) / 2) / Math.max(1, n - 1) * (n > 1 ? 1 : 0); const xs = Math.abs(x - (GW - 1) / 2) < 0.3 ? [(GW - 1) / 2] : [x, GW - 1 - x];
+        for (const xx of xs) for (let k = 0; k < hs[c]; k++) out.push({ x: Math.round(xx * 2) / 2, y: -bh - k, z: 19 - k });
+      }
+      return out; } },
+  { id: 'diamond', name: 'Ромб', make(r){                    // пирамида над чашей, сверху лежит средний ряд
+      const w = 4 + Math.floor(r() * 3), hu = 2 + Math.floor(r() * (w - 1)), hd = 1 + Math.floor(r() * (w - 1));
+      const U = prim('pyr', w, hu), D = prim('drop', w - 1, hd), x0 = (GW - w) / 2;
+      return [...place(U, x0, 0, 10), ...place(D, x0 + 0.5, 1, 10 - hd - 1)]; } },
+  { id: 'hourglass', name: 'Песочные часы', make(r){         // чаша над пирамидой
+      const w = 5 + Math.floor(r() * 3), hd = 2 + Math.floor(r() * 2), hu = 2 + Math.floor(r() * 2), x0 = (GW - w) / 2;
+      return [...place(prim('drop', w, hd), x0, -hu - hd + 1, 0), ...place(prim('pyr', w, hu), x0, 0, 10)]; } },
+  { id: 'pyramid', name: 'Пирамида', make(r){ const w = 6 + Math.floor(r() * 3), h = 3 + Math.floor(r() * Math.min(4, w - 2)); return place(prim('pyr', w, h), (GW - w) / 2, 0, 0); } },
+  { id: 'wall', name: 'Стена', make(r){ const w = 6 + Math.floor(r() * 3), h = 3 + Math.floor(r() * 3); return place(prim('brick', w, h), (GW - w) / 2, 0, 0); } },
+  { id: 'crown', name: 'Корона', make(r){                    // набережная спереди, за ней башни-столбики разной высоты, симметрично
+      const base = 5 + Math.floor(r() * 4), out = place(prim('tower', base, 1), (GW - base) / 2, 0, 20);
+      const cols = Math.floor(base / 2), hs = [...Array(cols)].map(() => 1 + Math.floor(r() * 5));
+      for (let c = 0; c < cols; c++){
+        const x = (GW - base) / 2 + 0.5 + c * 2 > (GW - 1) / 2 ? null : (GW - base) / 2 + 0.5 + c * 2; if (x === null) continue;
+        for (const xx of x === (GW - 1) / 2 ? [x] : [x, GW - 1 - x]) for (let k = 0; k < hs[c]; k++) out.push({ x: xx, y: -1 - k, z: 19 - k });
+      }
+      return out; } },
+  { id: 'gate', name: 'Ворота', make(r){                     // две опоры и перекладина над пролётом
+      const tw = 2, th = 3 + Math.floor(r() * 3), span = 1 + Math.floor(r() * 3), x0 = (GW - (2 * tw + span)) / 2;
+      const T = prim('tower', tw, th), out = [...place(T, x0, 0, 1), ...place(T, x0 + tw + span, 0, 1)];
+      for (let x = x0 + 0.5; x <= x0 + 2 * tw + span - 1.5 + 1e-9; x++) out.push({ x, y: -th, z: 0 });
+      return out; } },
+  { id: 'bowl', name: 'Чаша', make(r){ const w = 6 + Math.floor(r() * 3), h = 3 + Math.floor(r() * 3); return place(prim('drop', w, h), (GW - w) / 2, 0, 0); } },
+  { id: 'stairs', name: 'Ступени', make(r){                  // две лестницы навстречу: долина или гора
+      const w = 3 + Math.floor(r() * 2), h = 3 + Math.floor(r() * 2), S = prim('stairs', w, h), valley = r() < 0.5;
+      return valley ? [...place(S, 0, 0, 0, true, w), ...place(S, GW - w, 0, 0)] : [...place(S, 0, 0, 0), ...place(S, GW - w, 0, 0, true, w)]; } },
+];
+const GEN = { N: [18, 30], OPEN: [5, 9], MIN_DEPTH: 2, TRIES: 200, CAP: 0.35, STARS: 0.3, HOLES: 0.6 };   // кадров, открыто, глубина, попыток; доли второго яруса, звёзд и окон
+function genLayout(seed){
+  const r = mulberry32(seed), t0 = Math.floor(r() * GEN_TEMPLATES.length);
+  const overlaps = (a, b) => Math.abs(a.x - b.x) < 1 && Math.abs(a.y - b.y) <= 1;
+  for (let attempt = 0; attempt < GEN.TRIES; attempt++){
+    const T = GEN_TEMPLATES[(t0 + Math.floor(attempt / 50)) % GEN_TEMPLATES.length];
+    let tiles = T.make(r).filter(c => c.x >= 0 && c.x <= GW - 1);
+    let name = T.name;
+    if (r() < GEN.HOLES){                                       // окна: вынуть 1–3 симметричные пары кадров (форма та же, рисунок другой)
+      const want = 1 + Math.floor(r() * 4);
+      for (let h = 0, done = 0; h < 10 && done < want && tiles.length > GEN.N[0] + 2; h++){
+        const c = tiles[Math.floor(r() * tiles.length)], m = tiles.find(u => u !== c && Math.abs(u.x - (GW - 1 - c.x)) < 1e-9 && u.y === c.y);
+        tiles = tiles.filter(u => u !== c && u !== m); done++;
+      }
+    }
+    if (r() < GEN.CAP){                                         // второй ярус: маленькая пирамида поверх середины, со сдвигом на полряда
+      const ys = tiles.map(c => c.y), mid = (Math.min(...ys) + Math.max(...ys)) / 2, w = 2 + Math.floor(r() * 2), kind = ['pyr', 'tower', 'brick'][Math.floor(r() * 3)];
+      const ch = kind === 'pyr' ? w : 1 + Math.floor(r() * 2), C = prim(kind, w, ch);
+      const cap = place(C, (GW - 1) / 2 - (primW(C) - 1) / 2, Math.round(mid) + 0.5 + Math.floor((ch - 1) / 2), 50);
+      if (cap.every(c => tiles.some(u => overlaps(c, u)))){ tiles = tiles.concat(cap); name += ' в два яруса'; }
+    }
+    if (r() < GEN.STARS){                                        // свободные кадры-звёзды симметрично по краям
+      const ys = tiles.map(c => c.y), y0 = Math.min(...ys) - 1, y1 = Math.max(...ys);
+      for (let f = 0; f < 12 && tiles.filter(c => c.star).length < 4; f++){
+        const s1 = { x: Math.floor(r() * (GW / 2 - 1)) + (r() < 0.5 ? 0 : 0.5), y: y0 + Math.floor(r() * (y1 - y0 + 1)), z: 0, star: true }, s2 = { x: GW - 1 - s1.x, y: s1.y, z: 0, star: true };
+        if (!overlaps(s1, s2) && [s1, s2].every(p => tiles.every(u => !overlaps(p, u)))) tiles.push(s1, s2);
+      }
+      if (tiles.some(c => c.star)) name += ' со звёздами';
+    }
+    if (tiles.length < GEN.N[0] || tiles.length > GEN.N[1]) continue;
+    const L = { name: 'gen:' + seed, title: name, family: T.id, tiles: tiles.map(c => ({ x: c.x, y: c.y, z: c.z })) };
+    LAYOUTS[L.name] = L; delete LAYOUT_CACHE[L.name];
+    const B = buildLayout(L.name), open = B.initCover.filter(c => !c).length;
+    if (open >= GEN.OPEN[0] && open <= GEN.OPEN[1] && Math.max(...B.depth) >= GEN.MIN_DEPTH && B.width <= GW && !layoutProblems(L.name).length) return B;
+    delete LAYOUTS[L.name]; delete LAYOUT_CACHE[L.name];
+  }
+  return buildLayout('peaks3');                                  // запасной вариант — три пика
+}
+// Бесконечные уровни: форма по номеру, завесы по кругу, сложность «пилой» (окно побед случайного бота с «+3»).
+// Сид раздачи подбирают боты прямо при запуске уровня — детерминированно: тот же номер даёт тот же уровень.
+const ENDLESS = {
+  BANDS: [[0.6, 0.9], [0.45, 0.75], [0.6, 0.9], [0.3, 0.6], [0.45, 0.75]],   // уровень n % 5: легко, средне, легко, трудно, средне
+  VEILS: [null, { cloud: 3 }, { lantern: 3 }, { cloud: 2, lantern: 2 }, null, { cloud: 3, lantern: 3 }, { cloud: 4 }, { lantern: 4 }],
+  FILM_PER_TILE: 0.42,    // плёнка ≈ 0,42 кадра на кадр стола
+  CANDIDATES: 24, RUNS_R: 30, RUNS_G: 4, GREEDY_MIN: 0.75,     // кандидатов сида, прогонов случайного и жадного на кандидата
+  INTRO_BAND: [0.75, 1],  // вводный уровень механики: случайный с «+3» выигрывает часто, жадный — всегда
+  // механики после ручных уровней: каждая вводится на своём уровне одна, дальше уровни смешивают открытые (1–2 на уровень)
+  ELEMENTS: [{ id: 'star', from: 13 }, { id: 'flash', from: 15 }, { id: 'order', from: 17 }, { id: 'rain', from: 19 }, { id: 'snow', from: 21 }],
+};
+// Механики уровня n: на вводном — только новая; дальше 1–2 из открытых (каждый третий уровень — две), выбор по сиду номера.
+function levelElements(n){
+  const E = ENDLESS.ELEMENTS, intro = E.find(e => e.from === n);
+  if (intro) return { list: [intro.id], intro: intro.id };
+  const open = E.filter(e => e.from <= n).map(e => e.id); if (!open.length) return { list: [], intro: null };
+  const r = mulberry32(n * 4049 + 3), k = Math.min(open.length, n % 3 === 0 ? 2 : 1);
+  return { list: shuffle(open.slice(), r).slice(0, k), intro: null };
+}
+const ENDLESS_CACHE = {};
+function levelShapeSeed(n, salt){ const r = mulberry32(n * 7919 + 17 + (salt || 0) * 104729); r(); return (r() * 4294967296) >>> 0; }   // номер уровня → сид формы (хорошо перемешан)
+const shapeKey = (L) => L.x.map((x, i) => x + ',' + L.y[i] + ',' + L.z[i]).sort().join(';');
+// Форма уровня n: если совпала с формой одного из 5 предыдущих уровней, перебрасываем с солью — подряд форма не повторяется.
+// Формы считаются по порядку от 13-го и кешируются: первый заход на 1000-й уровень строит ~1000 форм (~50 мс).
+const LEVEL_SHAPES = {};
+function levelLayout(n){
+  if (LEVEL_SHAPES[n]) return buildLayout(LEVEL_SHAPES[n]);
+  for (let m = 13; m <= n; m++){
+    if (LEVEL_SHAPES[m]) continue;
+    const recent = new Set(); for (let j = Math.max(13, m - 5); j < m; j++) recent.add(shapeKey(buildLayout(LEVEL_SHAPES[j])));
+    let L = genLayout(levelShapeSeed(m));
+    for (let salt = 1; salt < 12 && recent.has(shapeKey(L)); salt++) L = genLayout(levelShapeSeed(m, salt));
+    LEVEL_SHAPES[m] = L.name;
+  }
+  return buildLayout(LEVEL_SHAPES[n]);
+}
+function endlessSpec(li, mode){
+  const key = li + ':' + mode; if (ENDLESS_CACHE[key]) return ENDLESS_CACHE[key];
+  const n = li + 1, ten = mode === 10, lay = levelLayout(n);
+  const EL = levelElements(n), has = (id) => EL.list.includes(id), band = EL.intro ? ENDLESS.INTRO_BAND : ENDLESS.BANDS[n % ENDLESS.BANDS.length];   // вводный уровень механики — лёгкий
+  const gmin = EL.intro ? 1 : ENDLESS.GREEDY_MIN;
+  let veils = EL.intro ? null : ENDLESS.VEILS[n % ENDLESS.VEILS.length];
+  if (has('snow')) veils = Object.assign({}, veils || {}, { snow: 3 });
+  const want = veils ? (veils.cloud || 0) + (veils.lantern || 0) + (veils.snow || 0) : 0;
+  const base = { li, layout: lay.name, scale: ten ? 10 : 8, stock: Math.round(lay.n * ENDLESS.FILM_PER_TILE) + (ten ? CFG.DECK_10_EXTRA : 0), script: null, veils, wilds: 0, endless: true,
+    stars: has('star') ? CFG.STAR_PER_LEVEL : 0, flash: has('flash') ? 2 : 0, order: has('order'), rain: has('rain') ? 2 : 0, intro: EL.intro, elements: EL.list };
+  let best = null, bestD = 9;
+  for (let c = 0; c < ENDLESS.CANDIDATES; c++){
+    const spec = Object.assign({}, base, { seed: n * 1000 + c });
+    if (makeState(spec).veil.filter(Boolean).length !== want) continue;
+    let rw = 0, gw = 0;
+    for (let i = 0; i < ENDLESS.RUNS_R; i++) rw += runBot(makeState(spec), 'random', i + 1, { extra: true }).win ? 1 : 0;
+    for (let i = 0; i < ENDLESS.RUNS_G; i++) gw += runBot(makeState(spec), 'greedy', i + 1, { extra: true }).win ? 1 : 0;
+    const rr = rw / ENDLESS.RUNS_R, g = gw / ENDLESS.RUNS_G, d = rr < band[0] ? band[0] - rr : rr > band[1] ? rr - band[1] : 0;
+    spec.check = { random: rr, greedy: g, band };
+    if (g >= gmin && d === 0){ best = spec; break; }
+    if (g >= 0.5 && d < bestD){ bestD = d; best = spec; }
+  }
+  return (ENDLESS_CACHE[key] = best || Object.assign({}, base, { seed: n * 1000 }));
+}
+
+// Спецификация раздачи уровня li в режиме mode (8 | 10).
+function levelSpec(li, mode){
+  if (li >= LEVELS.length) return endlessSpec(li, mode);
+  const L = LEVELS[li], ten = mode === 10 && L.scale === 8 && !L.script;
+  return { li, layout: L.layout, scale: ten ? 10 : L.scale, stock: L.stock + (ten ? CFG.DECK_10_EXTRA : 0),
+    seed: ten ? L.seed10 : L.seed, script: L.script || null, veils: L.veils || null, wilds: L.wilds || 0 };
+}
+// Сбалансированная раздача: значения 0..V-1 поровну, перемешаны по сиду (как колода карт в классике).
+function dealValues(total, V, rnd){ const a = []; for (let i = 0; i < Math.ceil(total / V) * V; i++) a.push(i % V); return shuffle(a, rnd); }
+// Тучи и фонари: сколько и где задаёт уровень (open — на открытых с начала кадрах, covered — на закрытых, any — где угодно), на какие кадры — сид.
+function placeVeils(lay, veils, seed){
+  const veil = new Array(lay.n).fill(null);
+  if (!veils) return veil;
+  const rnd = mulberry32(((seed || 1) * 31 + 7) >>> 0), where = veils.where || 'any';
+  const ok = (k) => (where === 'open' ? lay.initCover[k] === 0 : where === 'covered' ? lay.initCover[k] > 0 : true);
+  const pool = shuffle([...Array(lay.n).keys()].filter(ok), rnd);
+  let i = 0;
+  for (let c = 0; c < (veils.cloud || 0) && i < pool.length; c++) veil[pool[i++]] = 'cloud';
+  for (let c = 0; c < (veils.lantern || 0) && i < pool.length; c++) veil[pool[i++]] = 'lantern';
+  for (let c = 0; c < (veils.snow || 0) && i < pool.length; c++) veil[pool[i++]] = 'snow';
+  return veil;
+}
+// Кадры со вспышкой и с дождём: сколько задаёт уровень, на какие — сид (не на кадрах под завесой).
+function placeMarks(lay, count, seed, salt, veil){
+  const mark = new Array(lay.n).fill(false); if (!count) return mark;
+  const pool = shuffle([...Array(lay.n).keys()].filter(k => !veil[k]), mulberry32(((seed || 1) * 131 + salt) >>> 0));
+  pool.slice(0, count).forEach(k => { mark[k] = true; });
+  return mark;
+}
+// Заказ: время, кадров которого на столе больше всего (не меньше 2), снять ORDER_NEED (или сколько есть).
+function makeOrder(s){
+  const cnt = new Array(s.V).fill(0); for (let k = 0; k < s.lay.n; k++) if (s.present[k]) cnt[s.tab[k]]++;
+  let v = 0; for (let i = 1; i < s.V; i++) if (cnt[i] > cnt[v]) v = i;
+  return cnt[v] >= 2 ? { v, need: Math.min(CFG.ORDER_NEED, cnt[v]), got: 0 } : null;
+}
+
+function makeState(spec){
+  const lay = buildLayout(spec.layout), ids = SCALES[spec.scale], V = ids.length, n = lay.n;
+  let tab, top, stock, extra, bonus;
+  if (spec.script){
+    const ix = (id) => ids.indexOf(id);
+    tab = spec.script.tab.map(ix); top = ix(spec.script.top); stock = spec.script.stock.map(ix);
+    extra = spec.script.extra.map(ix); bonus = (spec.script.bonus || []).map(ix);
+  } else {
+    const ex = CFG.EXTRA_N * CFG.EXTRA_MAX, vals = dealValues(n + 1 + spec.stock + ex + CFG.BONUS_POOL, V, mulberry32(spec.seed));
+    tab = vals.slice(0, n); top = vals[n]; stock = vals.slice(n + 1, n + 1 + spec.stock);
+    extra = vals.slice(n + 1 + spec.stock, n + 1 + spec.stock + ex); bonus = vals.slice(n + 1 + spec.stock + ex, n + 1 + spec.stock + ex + CFG.BONUS_POOL);
+  }
+  const s = { li: spec.li, scale: spec.scale, ids, V, lay, tab, top, stock, extra, bonus,
+    present: new Array(n).fill(true), cover: lay.initCover.slice(), left: n, veil: placeVeils(lay, spec.veils, spec.seed),
+    extraLeft: Math.min(CFG.EXTRA_MAX, Math.floor(extra.length / CFG.EXTRA_N)), extraUsed: 0,
+    wilds: spec.wilds || 0, wildTop: false, wildKind: null, wildsEarned: 0, wildsUsed: 0, gaugeFrames: 0, veilsCleared: 0,
+    streak: 0, dir: 0, dirRun: 0, maxStreak: 0, streaks: [], moves: 0, plays: 0, draws: 0, fullDays: 0, peaks: 0,
+    prize: dealValues(CFG.PRIZE_POOL, V, mulberry32(((spec.seed || 1) * 3 + 11) >>> 0)).slice(0, CFG.PRIZE_POOL),
+    starsLeft: spec.stars || 0, star: null, starsCaught: 0, revealUntil: -1, flashes: 0, rainPending: false, rainbows: 0,
+    ordersLeft: spec.order ? CFG.ORDER_MAX : 0, order: null, ordersDone: 0, intro: spec.intro || null, elements: spec.elements || [] };
+  s.flash = placeMarks(lay, spec.flash || 0, spec.seed, 17, s.veil);
+  s.rain = placeMarks(lay, spec.rain || 0, spec.seed, 29, s.veil.map((v, k) => v || s.flash[k]));
+  if (s.ordersLeft) s.order = makeOrder(s);
+  applyVeils(s);
+  return s;
+}
+function createState(li, mode){ return makeState(levelSpec(li, mode || CFG.MODE_DEFAULT)); }
+function cloneState(s){ return { ...s, present: s.present.slice(), cover: s.cover.slice(), stock: s.stock.slice(), bonus: s.bonus.slice(), veil: s.veil.slice(), streaks: s.streaks.slice(),
+  prize: s.prize.slice(), star: s.star && { ...s.star }, order: s.order && { ...s.order } }; }
+
+function adjacent(a, b, V){ const d = (b - a + V) % V; return d === 1 || d === V - 1; }
+function gaugeHalf(s){ return CFG.GAUGE_EVERY || Math.ceil(s.V / 2); }   // столько ходов в одну сторону — кадр на плёнку
+function veilKey(s, v){ const id = s.ids[v]; return DAY_TIMES.includes(id) ? 'cloud' : NIGHT_TIMES.includes(id) ? 'lantern' : null; }
+// Какие завесы снимает время v: день — тучи, полдень — ещё и снег, ночь — фонари.
+function veilKinds(s, v){ const k = veilKey(s, v), out = k ? [k] : []; if (s.ids[v] === 'noon') out.push('snow'); return out; }
+// Пока в видоискателе день — туч на открытых кадрах нет; ночь — фонари горят; полдень — снег тает. Вызывается после каждого действия.
+function applyVeils(s){
+  if (s.wildTop) return [];
+  const kinds = veilKinds(s, s.top); if (!kinds.length) return [];
+  const out = [];
+  for (let k = 0; k < s.lay.n; k++) if (kinds.includes(s.veil[k]) && s.present[k] && s.cover[k] === 0){ s.veil[k] = null; out.push(k); }
+  s.veilsCleared += out.length;
+  return out;
+}
+function isOpen(s, k){ return s.present[k] && s.cover[k] === 0; }
+function exposed(s){ const e = []; for (let k = 0; k < s.lay.n; k++) if (s.present[k] && s.cover[k] === 0) e.push(k); return e; }
+// Что будет от тапа по кадру k: ok — ход; same — тот же час; skip — через ступень и дальше; veiled — под тучей или фонарём;
+// covered — закрыт; gone — снят.
+function classify(s, k){
+  if (!s.present[k]) return 'gone';
+  if (s.cover[k]) return 'covered';
+  if (s.veil[k]) return 'veiled';
+  if (s.wildTop) return 'ok';
+  if (s.tab[k] === s.top) return 'same';
+  return adjacent(s.top, s.tab[k], s.V) ? 'ok' : 'skip';
+}
+function playable(s){ return exposed(s).filter(k => classify(s, k) === 'ok'); }
+function canWild(s){ return s.wilds > 0 && !s.wildTop && exposed(s).some(k => !s.veil[k]); }
+function canStar(s){ return !!s.star && s.prize.length > 0; }
+function isRevealed(s){ return s.moves < s.revealUntil; }   // вспышка ещё действует: закрытые кадры видны
+function givePrize(s, n){ let g = 0; for (; g < n && s.prize.length; g++) s.stock.push(s.prize.shift()); return g; }
+function legalMoves(s){ const m = playable(s); if (s.stock.length) m.push('draw'); if (canWild(s)) m.push('wild'); if (canStar(s)) m.push('star'); if (canExtra(s)) m.push('extra'); return m; }
+
+// Звезда гаснет через STAR_MOVES действий (тап по звезде действием не считается).
+function tickStar(s){ if (!s.star) return false; if (--s.star.left > 0) return false; s.star = null; return true; }
+// Одно действие, мутирует состояние: номер кадра | 'draw' | 'wild' | 'star' | 'extra'. Возвращает событие для оболочки или null.
+function step(s, act){
+  if (act === 'star'){                                         // поймать падающую звезду: кадры на плёнку, хода не тратит
+    if (!canStar(s)) return null;
+    const n = givePrize(s, CFG.STAR_FRAMES); s.star = null; s.starsCaught++;
+    return { kind: 'star', n };
+  }
+  if (act === 'draw'){
+    if (!s.stock.length) return null;
+    const broke = s.streak, starGone = tickStar(s);
+    if (s.streak) s.streaks.push(s.streak);
+    s.streak = 0; s.dir = 0; s.dirRun = 0; s.wildTop = false; s.wildKind = null;
+    s.top = s.stock.shift(); s.draws++; s.moves++;
+    return { kind: 'draw', v: s.top, broke, starGone, cleared: applyVeils(s) };
+  }
+  if (act === 'wild'){
+    if (!canWild(s)) return null;
+    const starGone = tickStar(s);
+    s.wilds--; s.wildsUsed++; s.wildTop = true; s.wildKind = 'eclipse'; s.moves++;
+    return { kind: 'wild', starGone };
+  }
+  if (act === 'extra'){
+    if (!canExtra(s)) return null;
+    s.stock = s.extra.slice(s.extraUsed * CFG.EXTRA_N, (s.extraUsed + 1) * CFG.EXTRA_N);
+    s.extraUsed++; s.extraLeft--;
+    return { kind: 'extra', n: s.stock.length };
+  }
+  const k = act;
+  if (classify(s, k) !== 'ok') return null;
+  const prev = s.top, v = s.tab[k], wasWild = s.wildTop, revealed = [], starGone = tickStar(s);
+  s.present[k] = false; s.left--;
+  for (const x of s.lay.covers[k]){ s.cover[x]--; if (s.cover[x] === 0 && s.present[x]) revealed.push(x); }
+  let dir = 0, fullDay = false, gaugeFrame = false, wildEarned = false;
+  if (!wasWild){                                              // ход на «Затмение» шкалу не двигает и не рвёт
+    dir = (v - prev + s.V) % s.V === 1 ? 1 : -1;
+    if (dir === s.dir) s.dirRun++; else { s.dir = dir; s.dirRun = 1; }
+    if (CFG.GAUGE_ON && s.dirRun % gaugeHalf(s) === 0 && s.dirRun < s.V && s.bonus.length){ s.stock.push(s.bonus.shift()); s.gaugeFrames++; gaugeFrame = true; }
+    if (s.dirRun >= s.V){                                     // «Полный день»: V ходов подряд в одну сторону
+      fullDay = true; s.fullDays++; s.dirRun = 0;
+      if (CFG.GAUGE_ON && s.wilds < CFG.WILD_MAX){ s.wilds++; s.wildsEarned++; wildEarned = true; }
+    }
+  }
+  s.top = v; s.wildTop = false; s.wildKind = null; s.streak++; s.plays++; s.moves++;
+  if (s.streak > s.maxStreak) s.maxStreak = s.streak;
+  const peak = s.lay.tops.includes(k);
+  if (peak) s.peaks++;
+  const id = s.ids[v];
+  // вспышка: закрытые кадры видны FLASH_MOVES действий
+  let flash = false; if (s.flash[k]){ s.revealUntil = s.moves + CFG.FLASH_MOVES; s.flashes++; flash = true; }
+  // дождь → радуга: кадр с дождём заряжает радугу, следующий дневной ход становится радугой — к ней подходит любой кадр
+  let rainStart = false, rainbow = false;
+  if (s.rain[k]){ s.rainPending = true; rainStart = true; }
+  else if (s.rainPending && !wasWild && DAY_TIMES.includes(id)){ s.rainPending = false; s.wildTop = true; s.wildKind = 'rainbow'; s.rainbows++; rainbow = true; }
+  // заказ: сними ORDER_NEED кадров одного времени — кадры на плёнку, потом следующий заказ
+  let orderDone = null;
+  if (s.order && v === s.order.v && ++s.order.got >= s.order.need){
+    orderDone = { v, n: givePrize(s, CFG.ORDER_FRAMES) }; s.ordersDone++; s.ordersLeft--;
+    s.order = s.ordersLeft > 0 ? makeOrder(s) : null;
+  }
+  // падающая звезда: серия привела в ночь
+  let starSpawn = false;
+  if (!s.star && s.starsLeft > 0 && s.streak >= CFG.STAR_STREAK && NIGHT_TIMES.includes(id)){ s.star = { left: CFG.STAR_MOVES }; s.starsLeft--; starSpawn = true; }
+  return { kind: 'play', k, v, prev, dir, wasWild, fullDay, gaugeFrame, wildEarned, peak, revealed, cleared: applyVeils(s), streak: s.streak,
+    flash, rainStart, rainbow, orderDone, starSpawn, starGone };
+}
+function applyMove(s, act){ const n = cloneState(s); n.ev = step(n, act); return n; }
+
+function isWin(s){ return s.left === 0; }
+function isStuck(s){ return s.left > 0 && !s.stock.length && !playable(s).length && !canWild(s) && !canStar(s); }
+function canExtra(s){ return isStuck(s) && s.extraLeft > 0 && s.left <= CFG.NEAR_WIN; }
+function isLose(s){ return isStuck(s) && !canExtra(s); }
+
+// --- полный перебор с открытыми картами (аудит: раздача вообще проходима без «+3») ---
+// Возвращает список действий, null — нерешаемо, undefined — превышен предел узлов. «Затмение» — только когда хода нет.
+function solve(s0){
+  const dead = new Set(), path = []; let nodes = 0, over = false;
+  const key = (s) => {
+    let m = 0, vb = 0;
+    for (let k = 0; k < s.lay.n; k++){ if (!s.present[k]) m += 2 ** k; if (s.veil[k]) vb += 2 ** k; }
+    return m + ':' + vb + ':' + s.stock.length + ':' + s.bonus.length + ':' + s.top + ':' + s.dir + ':' + s.dirRun + ':' + s.wilds + ':' + (s.wildTop ? 1 : 0) +
+      ':' + (s.star ? s.star.left : 0) + ':' + s.starsLeft + ':' + s.prize.length + ':' + (s.rainPending ? 1 : 0) + ':' + (s.order ? s.order.v + '/' + s.order.got : '-') + ':' + s.ordersLeft;
+  };
+  function rec(s){
+    if (isWin(s)) return true;
+    if (++nodes > CFG.SOLVE_NODES){ over = true; return false; }
+    const kk = key(s); if (dead.has(kk)) return false;
+    const pl = playable(s), opts = canStar(s) ? ['star'] : pl.slice();     // звезду ловим сразу: это бесплатно
+    if (!canStar(s)){ if (s.stock.length) opts.push('draw'); if (!pl.length && canWild(s)) opts.push('wild'); }
+    for (const a of opts){
+      const t = cloneState(s); step(t, a); path.push(a);
+      if (rec(t)) return true;
+      path.pop(); if (over) return false;
+    }
+    dead.add(kk); return false;
+  }
+  const ok = rec(cloneState(s0));
+  return ok ? path.slice() : over ? undefined : null;
+}
+
+// --- боты (PROTO-BASE §6): случайный, жадный, планировщик ---
+// random  — случайный разрешённый ход, добор только когда хода нет (новичок «тыкаю в подходящее»);
+// greedy  — видит только открытые кадры: больше подходящих после хода, шанс на открытие, держит направление шкалы,
+//           ведёт время к тучам и фонарям; «Затмение» бережёт до конца плёнки;
+// plan    — на каждой развилке PLAN_N прогонов до конца на случайной расстановке неизвестного (закрытые, плёнка, запас шкалы).
+function newlyExposed(s, k){ let c = 0; for (const x of s.lay.covers[k]) if (s.present[x] && s.cover[x] === 1) c++; return c; }
+function greedyScore(s, k, ex){
+  const nt = s.tab[k], vk = veilKey(s, nt), p = 2 / s.V; let known = 0, veilB = 0;
+  for (const q of ex){
+    if (q === k) continue;
+    if (s.veil[q] === vk && vk) veilB += 0.7;
+    if ((!s.veil[q] || s.veil[q] === vk) && adjacent(nt, s.tab[q], s.V)) known++;
+  }
+  let dirB = 0;
+  if (CFG.GAUGE_ON && !s.wildTop){ const d = (nt - s.top + s.V) % s.V === 1 ? 1 : -1; if (s.dir === 0 || d === s.dir) dirB = 0.35 * Math.min(1, (s.dirRun + 1) / gaugeHalf(s)); }
+  const id = s.ids[nt];
+  if (id === 'noon') for (const q of ex) if (q !== k && s.veil[q] === 'snow') veilB += 0.7;
+  let elB = 0;
+  if (s.order && nt === s.order.v) elB += 0.6;
+  if (s.rainPending && DAY_TIMES.includes(id)) elB += 0.5;
+  if (!s.star && s.starsLeft > 0 && s.streak + 1 >= CFG.STAR_STREAK && NIGHT_TIMES.includes(id)) elB += 0.4;
+  if (s.flash[k]) elB += 0.3;
+  return known + newlyExposed(s, k) * p + dirB + veilB + elB;
+}
+function greedyPick(s, pl, rnd){
+  const ex = exposed(s);
+  let best = pl[0], bs = -1e9;
+  for (const k of pl){ const sc = greedyScore(s, k, ex) + rnd() * 1e-3; if (sc > bs){ bs = sc; best = k; } }
+  return best;
+}
+function determinize(s, rnd){
+  const t = cloneState(s); t.tab = s.tab.slice();
+  const idx = [], vals = [];
+  const rev = isRevealed(s);                                   // при вспышке закрытые кадры известны — их не перемешиваем
+  for (let k = 0; k < s.lay.n; k++) if (!rev && s.present[k] && s.cover[k] > 0){ idx.push(k); vals.push(s.tab[k]); }
+  for (const v of s.stock) vals.push(v);
+  for (const v of s.bonus) vals.push(v);
+  shuffle(vals, rnd);
+  idx.forEach((k, i) => { t.tab[k] = vals[i]; });
+  t.stock = vals.slice(idx.length, idx.length + s.stock.length);
+  t.bonus = vals.slice(idx.length + s.stock.length);
+  return t;
+}
+// Прогон жадным до конца: >0 — победа (1 + остаток плёнки), <0 — проигрыш (минус оставшиеся кадры).
+function rollout(t, rnd){
+  while (true){
+    if (t.left === 0) return 1 + t.stock.length * 0.01;
+    if (canStar(t)){ step(t, 'star'); continue; }
+    const pl = playable(t);
+    if (pl.length) step(t, greedyPick(t, pl, rnd));
+    else if (t.stock.length) step(t, 'draw');
+    else if (canWild(t)) step(t, 'wild');
+    else return -t.left * 0.01;
+  }
+}
+// Средняя оценка каждого варианта по n прогонам (общие расстановки неизвестного для всех вариантов).
+function optionValues(s, opts, rnd, n){
+  const score = opts.map(() => 0), wins = opts.map(() => 0);
+  for (let i = 0; i < n; i++){
+    const base = determinize(s, rnd);
+    opts.forEach((a, j) => { const t = cloneState(base); step(t, a); const r = rollout(t, rnd); score[j] += r; if (r > 0) wins[j]++; });
+  }
+  return { score, wins };
+}
+function planChoose(s, opts, rnd){
+  if (opts.length === 1) return opts[0];
+  const { score } = optionValues(s, opts, rnd, CFG.PLAN_N);
+  let bj = 0; for (let j = 1; j < opts.length; j++) if (score[j] > score[bj]) bj = j;
+  return opts[bj];
+}
+function planPick(s, pl, rnd){ return planChoose(s, pl, rnd); }
+// Варианты решения: ходы на поле; если хода нет — плёнка и/или «Затмение».
+function decisionOptions(s){
+  const pl = playable(s); if (pl.length) return pl;
+  const o = []; if (s.stock.length) o.push('draw'); if (canWild(s)) o.push('wild');
+  return o;
+}
+function botPick(s, bot, rnd){
+  if (canStar(s)) return 'star';                               // звезду ловят все боты: это бесплатно
+  const pl = playable(s);
+  if (pl.length){
+    if (bot === 'random') return pl[Math.floor(rnd() * pl.length)];
+    if (bot === 'greedy') return greedyPick(s, pl, rnd);
+    return planPick(s, pl, rnd);
+  }
+  if (bot === 'plan' && s.stock.length && canWild(s)) return planChoose(s, ['draw', 'wild'], rnd);
+  if (s.stock.length) return 'draw';
+  return canWild(s) ? 'wild' : null;
+}
+// Прогон бота до конца партии. opt.extra — брать «+3» на почти-победе. Возвращает исход и метрики ощущения.
+function runBot(s, bot, seed, opt){
+  opt = opt || {}; const rnd = mulberry32(seed);
+  const m = { decisions: 0, open: 0, play: 0, noMove: 0, sameTempt: 0, taps: 0, firstPeakTap: 0, firstJuiceTap: 0, usedExtra: 0, winNoExtra: false };
+  while (true){
+    if (isWin(s)) break;
+    const ex = exposed(s), pl = playable(s);
+    m.decisions++; m.open += ex.length; m.play += pl.length;
+    if (!pl.length) m.noMove++;
+    if (!s.wildTop && ex.some(k => !s.veil[k] && s.tab[k] === s.top)) m.sameTempt++;
+    const act = botPick(s, bot, rnd);
+    if (act === null){
+      if (opt.extra && canExtra(s)){ step(s, 'extra'); m.usedExtra++; continue; }
+      break;
+    }
+    const ev = step(s, act); if (act !== 'star') m.taps++;
+    if (ev.kind === 'play'){
+      if (ev.peak && !m.firstPeakTap) m.firstPeakTap = m.taps;
+      if (!m.firstJuiceTap && (ev.peak || ev.fullDay || ev.gaugeFrame || ev.streak >= CFG.JUICE_STREAK)) m.firstJuiceTap = m.taps;
+    }
+  }
+  const streaks = s.streaks.concat(s.streak ? [s.streak] : []);
+  return Object.assign(m, { win: isWin(s), winNoExtra: isWin(s) && !m.usedExtra, left: s.left, plays: s.plays, draws: s.draws,
+    streaks, maxStreak: s.maxStreak, fullDays: s.fullDays, peaks: s.peaks, stockLeft: s.stock.length, moves: s.moves,
+    gaugeFrames: s.gaugeFrames, wildsEarned: s.wildsEarned, wildsUsed: s.wildsUsed, veilsCleared: s.veilsCleared,
+    starsCaught: s.starsCaught, flashes: s.flashes, rainbows: s.rainbows, ordersDone: s.ordersDone });
+}
+function randomRun(li, seed, opt){ opt = opt || {}; return runBot(createState(li, opt.mode), 'random', seed, opt); }
+function greedyRun(li, seed, opt){ opt = opt || {}; return runBot(createState(li, opt.mode), 'greedy', seed === undefined ? 1 : seed, opt); }
+function planRun(li, seed, opt){ opt = opt || {}; return runBot(createState(li, opt.mode), 'plan', seed, opt); }
+/* КОНЕЦ ЯДРА */
+
+// =============================================================================================
+// Оболочка: арт и свет, отрисовка, ввод, звук, экраны, метрики плейтеста, дебаг-хук. Время абсолютное (§4).
+// =============================================================================================
+const NAME = 'golden-hour';
+const T0 = performance.now();
+function log(kind, name, info){            // журнал [game] — одна строка на событие (§11)
+  console.log('[game] ' + JSON.stringify({ t: +((performance.now() - T0) / 1000).toFixed(3), kind, name, info: info === undefined ? '' : String(info) }));
+}
+const SAVE_KEY = NAME + '.v1';
+function loadSave(){ try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch (e) { return {}; } }
+function save(){ try { localStorage.setItem(SAVE_KEY, JSON.stringify(G.save)); } catch (e) {} }
+
+// --- Арт (§1, §11): панорамы залива нарисованы GPT — одна композиция, 10 вариантов света; спрайты — тоже GPT. ---
+// Файлы лежат в assets/ и грузятся по имени. Если картинка не загрузилась, мир рисуется процедурно (drawWorld).
+const ART = {
+  PANO: { dawn: 'assets/pano-dawn.jpg', morning: 'assets/pano-morning.jpg', late: 'assets/pano-late.jpg', noon: 'assets/pano-noon.jpg',
+    day: 'assets/pano-day.jpg', golden: 'assets/pano-golden.jpg', sunset: 'assets/pano-sunset.jpg', dusk: 'assets/pano-dusk.jpg',
+    night: 'assets/pano-night.jpg', midnight: 'assets/pano-midnight.jpg' },
+  SPRITE: { cloud: 'assets/sprite-cloud.png', lantern: 'assets/sprite-lantern.png', eclipse: 'assets/sprite-eclipse.png', film: 'assets/sprite-film.png',
+    hand: 'assets/sprite-hand.png', deck: 'assets/sprite-deck.png' },
+  DECK_EDGE: 0.1,         // дальний край настила на спрайте — доля его высоты
+  HAND_TIP: [0.17, 0.12], // кончик пальца на спрайте руки — доли ширины и высоты
+  HORIZON: 0.41,          // горизонт на всех панорамах, доля высоты (замер по перепаду яркости строк)
+  CROP: [0.04, 0.96],     // фото полароида — квадрат из панорамы по этой доле ширины
+  CROP_HOR: 0.56,         // горизонт на фото полароида, доля высоты фото
+  // Силуэт берега, города и моста над горизонтом: [x — доля ширины панорамы, высота — доля её высоты]. Диски светил прячутся за ним.
+  SKYLINE: [[0, 0.028], [0.035, 0.034], [0.045, 0.05], [0.06, 0.05], [0.07, 0.03], [0.14, 0.022], [0.2, 0.016], [0.26, 0.02], [0.36, 0.03],
+    [0.44, 0.05], [0.5, 0.075], [0.56, 0.07], [0.61, 0.074], [0.66, 0.045], [0.73, 0.03], [0.775, 0.03], [0.78, 0.07], [0.805, 0.07],
+    [0.81, 0.03], [0.905, 0.03], [0.91, 0.076], [0.94, 0.076], [0.945, 0.03], [1, 0.026]],
+};
+const IMG = {};                             // pano:<id>, sprite:<имя>, lanternOff; EDGE[id] — цвет верхней и нижней кромки панорамы
+const EDGE = {};
+function loadArt(){
+  const one = (key, src, done) => { const im = new Image(); im.onload = () => { IMG[key] = im; if (done) done(im); log('event', 'art.load', key); };
+    im.onerror = () => log('event', 'art.fail', key + ' ' + src); im.src = src; };
+  for (const id in ART.PANO) one('pano:' + id, ART.PANO[id], (im) => { EDGE[id] = edgeColors(im, id); for (const k in PHOTO_CACHE) if (k.startsWith(id + ':')) delete PHOTO_CACHE[k]; });
+  for (const n in ART.SPRITE) one('sprite:' + n, ART.SPRITE[n], (im) => { if (n === 'lantern') IMG.lanternOff = tinted(im, 'rgba(16,20,34,0.62)'); if (n === 'eclipse') IMG['sprite:eclipse'] = defringe(im); });
+}
+// Цвет кромок панорамы: им заливаются полосы выше и ниже картинки на высоких экранах. Без доступа к пикселям — палитра LIGHT.
+function edgeColors(im, id){
+  try {
+    const c = document.createElement('canvas'); c.width = 8; c.height = 64; const x = c.getContext('2d');
+    x.drawImage(im, 0, 0, 8, 64); const d = x.getImageData(0, 0, 8, 64).data, avg = (row) => { let r = 0, g = 0, b = 0; for (let i = 0; i < 8; i++){ const a = (row * 8 + i) * 4; r += d[a]; g += d[a + 1]; b += d[a + 2]; } return [r / 8, g / 8, b / 8]; };
+    return { top: avg(0), bot: avg(63) };
+  } catch (e) { return { top: hex(LIGHT[id].top), bot: hex(LIGHT[id].wBot) }; }
+}
+function tinted(im, fill){ const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const x = c.getContext('2d'); x.drawImage(im, 0, 0); x.globalCompositeOperation = 'source-atop'; x.fillStyle = fill; x.fillRect(0, 0, c.width, c.height); return c; }
+// У спрайта затмения по краю короны остался красный ореол от вырезки фона — перекрашиваем полупрозрачные красные пиксели в цвет короны.
+function defringe(im){
+  try {
+    const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const x = c.getContext('2d'); x.drawImage(im, 0, 0);
+    const D = x.getImageData(0, 0, c.width, c.height), d = D.data;
+    for (let i = 0; i < d.length; i += 4) if (d[i + 3] < 250 && d[i] > d[i + 1] * 1.35){ d[i] = 255; d[i + 1] = 196; d[i + 2] = 120; d[i + 3] = Math.min(d[i + 3], 140); }
+    x.putImageData(D, 0, 0); return c;
+  } catch (e) { return im; }
+}
+
+// --- Свет: таблица LIGHT — светила, палитра для запасной отрисовки и цвет ореолов (§5, §11). ---
+// sunA/moonA — угол светила на дуге, градусы: 0 — восток (левый край горизонта), 90 — зенит, 180 — запад, больше 180 — под горизонтом.
+// Угол растёт вперёд по времени, поэтому ход «позже» ведёт светила вправо. sunS — размер солнца; sunVis/moonVis — яркость 0..1;
+// win — доля горящих окон и stars — звёзды (для процедурного запасного мира); refl — дорожка светила на воде.
+// Утро и вечер не зеркальны: утром солнце слева и пастель, вечером справа и золото. Соседи различаются и цветом, и местом светила.
+const LIGHT = {
+  dawn:     { top: '#6a68a6', mid: '#ea98b2', bot: '#ffcf9a', wTop: '#f0aea4', wBot: '#4e4a84', city: '#4a4272', sunCol: '#fff2d2', glow: '#ffae88', sunA: 8,   sunS: 1.25, sunVis: 1,   moonA: 168, moonVis: 0.35, win: 0.2,  stars: 0.12, refl: 0.7 },
+  morning:  { top: '#8cb3ea', mid: '#cfe2f4', bot: '#fff0bc', wTop: '#d4e5ee', wBot: '#6a90b6', city: '#7e8faa', sunCol: '#fffdf0', glow: '#fff0b0', sunA: 36,  sunS: 1.0,  sunVis: 1,   moonA: 200, moonVis: 0,    win: 0,    stars: 0,    refl: 0.5 },
+  late:     { top: '#4a9ff0', mid: '#93cdf8', bot: '#e2f4ff', wTop: '#9fd2f0', wBot: '#2f6fb0', city: '#60789a', sunCol: '#ffffff', glow: '#fffbe0', sunA: 62,  sunS: 0.9,  sunVis: 1,   moonA: 215, moonVis: 0,    win: 0,    stars: 0,    refl: 0.45 },
+  noon:     { top: '#1440c4', mid: '#2a78e4', bot: '#8ccfff', wTop: '#2b86da', wBot: '#0b2c74', city: '#33466a', sunCol: '#ffffff', glow: '#fffde6', sunA: 90,  sunS: 0.8,  sunVis: 1,   moonA: 230, moonVis: 0,    win: 0,    stars: 0,    refl: 0.6 },
+  day:      { top: '#139aa6', mid: '#45cdbb', bot: '#e0f6c2', wTop: '#3cc3ae', wBot: '#0b5866', city: '#2a5858', sunCol: '#fffbe0', glow: '#fff09c', sunA: 126, sunS: 0.95, sunVis: 1,   moonA: 250, moonVis: 0,    win: 0,    stars: 0,    refl: 0.5 },
+  golden:   { top: '#d6862a', mid: '#f6bd46', bot: '#ffe48c', wTop: '#f4bb4a', wBot: '#7a461a', city: '#683818', sunCol: '#fff4c2', glow: '#ffc23a', sunA: 158, sunS: 1.2,  sunVis: 1,   moonA: 290, moonVis: 0,    win: 0.08, stars: 0,    refl: 0.9 },
+  sunset:   { top: '#6c2264', mid: '#e0433a', bot: '#ff8c2c', wTop: '#e8603c', wBot: '#34163e', city: '#2a1430', sunCol: '#ffb25a', glow: '#ff5a2a', sunA: 174, sunS: 1.45, sunVis: 1,   moonA: 320, moonVis: 0,    win: 0.4,  stars: 0.05, refl: 1 },
+  dusk:     { top: '#26215c', mid: '#7450a8', bot: '#e08cc0', wTop: '#8c62ac', wBot: '#17123c', city: '#1c1736', sunCol: '#ff9a6a', glow: '#e070a0', sunA: 196, sunS: 1.2,  sunVis: 0.6, moonA: 18,  moonVis: 0.7,  win: 0.85, stars: 0.4,  refl: 0.5 },
+  night:    { top: '#060a22', mid: '#12225a', bot: '#2c3d7c', wTop: '#1c2c62', wBot: '#040714', city: '#0a0c1e', sunCol: '#ffffff', glow: '#ffffff', sunA: 270, sunS: 1,    sunVis: 0,   moonA: 52,  moonVis: 1,    win: 1,    stars: 1,    refl: 0.8 },
+  midnight: { top: '#020308', mid: '#060a1c', bot: '#10162e', wTop: '#0c1430', wBot: '#020306', city: '#050610', sunCol: '#ffffff', glow: '#ffffff', sunA: 300, sunS: 1,    sunVis: 0,   moonA: 98,  moonVis: 1,    win: 0.35, stars: 1.25, refl: 0.6 },
+};
+const WINDOW_COL = [255, 210, 122];       // свет в окнах (процедурный мир)
+const MOON_COL = [246, 242, 220];
+const COLOR_KEYS = ['top', 'mid', 'bot', 'wTop', 'wBot', 'city', 'sunCol', 'glow'];
+const NUM_KEYS = ['sunA', 'sunS', 'sunVis', 'moonA', 'moonVis', 'win', 'stars', 'refl'];
+function hex(h){ const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function rgba(c, a){ return 'rgba(' + (c[0] | 0) + ',' + (c[1] | 0) + ',' + (c[2] | 0) + ',' + (a === undefined ? 1 : a) + ')'; }
+const LP = {};                              // LIGHT в числах: цвета — [r,g,b]
+for (const id in LIGHT){ const L = LIGHT[id], p = {}; COLOR_KEYS.forEach(k => { p[k] = hex(L[k]); }); NUM_KEYS.forEach(k => { p[k] = L[k]; }); LP[id] = p; }
+function mixP(a, b, t){
+  const p = {};
+  for (const k of COLOR_KEYS) p[k] = [a[k][0] + (b[k][0] - a[k][0]) * t, a[k][1] + (b[k][1] - a[k][1]) * t, a[k][2] + (b[k][2] - a[k][2]) * t];
+  for (const k of NUM_KEYS) p[k] = a[k] + (b[k] - a[k]) * t;
+  return p;
+}
+// Ближайший к a угол, равный b по модулю 360, в нужную сторону: dir +1 — вперёд, -1 — назад, 0 — кратчайший.
+function unwrapTo(a, b, dir){
+  let d = (((b - a) % 360) + 360) % 360;
+  if (dir < 0 && d > 0) d -= 360; else if (dir === 0 && d > 180) d -= 360;
+  return a + d;
+}
+const easeOut = (t) => 1 - (1 - t) * (1 - t) * (1 - t);
+const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const easeOutBack = (t) => { const c1 = 1.7, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+function mixC(a, b, t){ return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; }
+const fxRnd = mulberry32(31337);          // разброс частиц и конфетти — тоже от сида (§5)
+
+// --- Запасной процедурный мир (если панорама не загрузилась): небо, город с мостом, залив. ---
+// Силуэт города: здания и окна, нормированные (x — доля ширины кадра, y и h — доля высоты города над горизонтом).
+function makeSkyline(seed){
+  const r = mulberry32(seed), b = [], win = [];
+  b.push({ x0: 0, x1: 0.07, h: 0.07, kind: 'flat' }, { x0: 0.07, x1: 0.15, h: 0.12, kind: 'flat' });   // низкий берег
+  let x = 0.17;
+  while (x < 0.62){
+    const bw = 0.03 + r() * 0.04, hump = 1 - Math.abs(x - 0.4) * 2.2;
+    const bh = clamp(0.22 + r() * 0.5 + hump * 0.35, 0.18, 1);
+    const kind = r() < 0.14 ? 'spire' : r() < 0.2 ? 'step' : 'flat';
+    b.push({ x0: x, x1: x + bw, h: bh, kind });
+    const cols = Math.max(1, Math.floor(bw / 0.013)), rows = Math.floor((bh - 0.06) / 0.085);
+    for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) win.push({ x: x + (i + 0.5) * bw / cols, y: 0.07 + j * 0.085, th: r(), b: b.length - 1 });
+    x += bw + (r() < 0.25 ? 0.006 : 0);
+  }
+  return { b, win };
+}
+const SKYLINE = makeSkyline(20261029);
+const STARS = (() => { const r = mulberry32(777), out = []; for (let i = 0; i < 70; i++) out.push({ x: r(), y: r() * 0.85, s: 0.6 + r() * 1.1, ph: r() * 6.28 }); return out; })();
+function drawWorld(c, R, P, now){
+  const g = c.createLinearGradient(0, R.y, 0, R.hor);
+  g.addColorStop(0, rgba(P.top)); g.addColorStop(0.6, rgba(P.mid)); g.addColorStop(1, rgba(P.bot));
+  c.fillStyle = g; c.fillRect(R.x, R.y, R.w, R.hor - R.y + 1);
+  if (P.stars > 0.02) for (const S of STARS){
+    const a = clamp(P.stars * (R.mini ? 1 : 0.65 + 0.35 * Math.sin(now / 600 + S.ph)), 0, 1); if (a < 0.03) continue;
+    c.fillStyle = 'rgba(255,255,255,' + a.toFixed(3) + ')'; const sz = R.mini ? Math.max(1, R.w / 60) * S.s * 0.8 : S.s * 1.3;
+    c.fillRect(R.x + S.x * R.w, R.y + S.y * (R.hor - R.y) * 0.9, sz, sz);
+  }
+  const cw = R.w, ch = R.cityH, base = R.hor;
+  c.fillStyle = rgba(P.city);
+  for (const B of SKYLINE.b){
+    const x0 = R.x + B.x0 * cw, x1 = R.x + B.x1 * cw, top = base - B.h * ch;
+    c.fillRect(x0, top, x1 - x0 + 0.6, base - top + 0.5);
+    if (B.kind === 'spire'){ c.beginPath(); c.moveTo(x0 + (x1 - x0) * 0.3, top); c.lineTo((x0 + x1) / 2, top - ch * 0.22); c.lineTo(x0 + (x1 - x0) * 0.7, top); c.fill(); }
+  }
+  const t1 = R.x + 0.74 * cw, t2 = R.x + 0.93 * cw, th = ch * 0.92, deck = base - ch * 0.16, tw = Math.max(1, ch * 0.055);
+  c.fillRect(R.x + 0.6 * cw, deck, 0.4 * cw, Math.max(1, ch * 0.04)); c.fillRect(t1 - tw / 2, base - th, tw, th); c.fillRect(t2 - tw / 2, base - th, tw, th);
+  if (P.win > 0.01){
+    c.fillStyle = rgba(WINDOW_COL, 0.95); const ww = Math.max(1, cw * 0.005), wh = Math.max(1, ch * 0.04), stp = R.mini ? 3 : 1;
+    for (let i = 0; i < SKYLINE.win.length; i += stp){ const Wn = SKYLINE.win[i]; if (Wn.th < P.win) c.fillRect(R.x + Wn.x * cw - ww / 2, base - Wn.y * ch - wh, ww, wh); }
+  }
+  const gw = c.createLinearGradient(0, R.hor, 0, R.y + R.h);
+  gw.addColorStop(0, rgba(P.wTop)); gw.addColorStop(1, rgba(P.wBot));
+  c.fillStyle = gw; c.fillRect(R.x, R.hor, R.w, R.y + R.h - R.hor);
+}
+
+// --- Мир: панорама текущего времени (на переходе — перетекание двух), поверх — солнце и луна на дуге. ---
+// R — рамка сцены: x, y, w, h, hor (y горизонта), cx/rx/ry (эллипс дуги светил), sunR, moonR, crop (доли ширины панорамы), mini.
+function drawPano(c, R, id, alpha){
+  const im = IMG['pano:' + id]; if (!im || alpha <= 0) return false;
+  const sx0 = R.crop[0] * im.width, sw = (R.crop[1] - R.crop[0]) * im.width, k = R.w / sw, ih = im.height * k, top = R.hor - ART.HORIZON * ih;
+  const E = EDGE[id] || { top: hex(LIGHT[id].top), bot: hex(LIGHT[id].wBot) };
+  c.globalAlpha = alpha;
+  // выше и ниже картинки тянем её крайние строки — без шва; EDGE — подстраховка, если строки не дотянулись
+  if (top > R.y){ c.fillStyle = rgba(E.top); c.fillRect(R.x, R.y, R.w, top - R.y + 1); c.drawImage(im, sx0, 0, sw, 2, R.x, R.y, R.w, top - R.y + 1); }
+  if (top + ih < R.y + R.h){ c.fillStyle = rgba(E.bot); c.fillRect(R.x, top + ih - 1, R.w, R.y + R.h - top - ih + 1); c.drawImage(im, sx0, im.height - 2, sw, 2, R.x, top + ih - 1, R.w, R.y + R.h - top - ih + 1); }
+  c.drawImage(im, sx0, 0, sw, im.height, R.x, top, R.w, ih);
+  c.globalAlpha = 1;
+  return true;
+}
+function skylineClip(c, R){
+  const im = IMG['pano:golden'] || IMG['pano:noon'], k = im ? R.w / ((R.crop[1] - R.crop[0]) * im.width) : 0, ih = im ? im.height * k : R.h;
+  c.beginPath(); c.moveTo(R.x - 1, R.y - 1); c.lineTo(R.x + R.w + 1, R.y - 1);
+  for (let i = ART.SKYLINE.length - 1; i >= 0; i--){
+    const [xf, hf] = ART.SKYLINE[i], x = R.x + (xf - R.crop[0]) / (R.crop[1] - R.crop[0]) * R.w;
+    c.lineTo(x, R.hor - hf * ih);
+  }
+  c.closePath(); c.clip();
+}
+function arcPos(R, a){ const r = a * Math.PI / 180; return { x: R.cx - R.rx * Math.cos(r), y: R.hor - R.ry * Math.sin(r), up: Math.sin(r) }; }
+// Серп луны — заранее нарисованный спрайт: диск минус смещённый круг (прозрачная тень, сквозь неё видно небо).
+const MOON_SPRITE = (() => {
+  const c = document.createElement('canvas'), n = 96; c.width = c.height = n; const x = c.getContext('2d');
+  x.fillStyle = rgba(MOON_COL); x.beginPath(); x.arc(n / 2, n / 2, n * 0.46, 0, 6.2832); x.fill();
+  x.globalCompositeOperation = 'destination-out'; x.beginPath(); x.arc(n / 2 - n * 0.2, n / 2 - n * 0.1, n * 0.4, 0, 6.2832); x.fill();
+  return c;
+})();
+function drawLights(c, R, P, now){
+  const sky = () => { c.beginPath(); c.rect(R.x, R.y, R.w, R.hor - R.y); c.clip(); };
+  if (P.moonVis > 0.01){
+    const p = arcPos(R, P.moonA), r = R.moonR;
+    if (p.up > -0.1){
+      c.save(); sky(); c.globalCompositeOperation = 'screen';
+      const g = c.createRadialGradient(p.x, p.y, r * 0.5, p.x, p.y, r * 4.5);
+      g.addColorStop(0, rgba([200, 215, 255], 0.38 * P.moonVis)); g.addColorStop(1, rgba([200, 215, 255], 0));
+      c.fillStyle = g; c.fillRect(p.x - r * 5, p.y - r * 5, r * 10, r * 10); c.restore();
+      c.save(); skylineClip(c, R); c.globalAlpha = P.moonVis; c.drawImage(MOON_SPRITE, p.x - r * 1.1, p.y - r * 1.1, r * 2.2, r * 2.2); c.restore();
+    }
+  }
+  if (P.sunVis > 0.01){
+    const p = arcPos(R, P.sunA), r = R.sunR * P.sunS;
+    if (p.y < R.hor + r * 6){
+      c.save(); sky(); c.globalCompositeOperation = 'screen';
+      const g = c.createRadialGradient(p.x, p.y, r * 0.4, p.x, p.y, r * 5.5);
+      g.addColorStop(0, rgba(P.glow, 0.75 * P.sunVis)); g.addColorStop(0.3, rgba(P.glow, 0.28 * P.sunVis)); g.addColorStop(1, rgba(P.glow, 0));
+      c.fillStyle = g; c.fillRect(p.x - r * 6, p.y - r * 6, r * 12, r * 12); c.restore();
+      c.save(); skylineClip(c, R); c.fillStyle = rgba(P.sunCol, P.sunVis); c.beginPath(); c.arc(p.x, p.y, r, 0, 6.2832); c.fill(); c.restore();
+    }
+  }
+  if (R.mini) return;
+  // дорожка светила на воде: мерцающие блики поверх панорамы
+  const span = R.y + R.h - R.hor, len = span * 0.55, rows = 26;
+  c.save(); c.globalCompositeOperation = 'screen';
+  const lights = [];
+  if (P.sunVis > 0.01){ const p = arcPos(R, P.sunA); if (p.up > -0.08) lights.push({ x: p.x, col: P.sunCol, a: P.refl * P.sunVis * clamp(1.15 - p.up, 0.3, 1), w: R.sunR * P.sunS }); }
+  if (P.moonVis > 0.01){ const p = arcPos(R, P.moonA); if (p.up > 0) lights.push({ x: p.x, col: MOON_COL, a: P.refl * P.moonVis * 0.5, w: R.moonR }); }
+  for (const L of lights) for (let i = 0; i < rows; i++){
+    const f = i / rows, y = R.hor + 2 + f * len, tw = 0.5 + 0.5 * Math.sin(i * 12.9898 + now / 260 + i * 0.7);
+    const w = L.w * (2.2 - 1.4 * f) * (0.3 + 0.7 * tw);
+    c.fillStyle = rgba(L.col, L.a * 0.35 * (1 - f)); c.fillRect(L.x - w / 2, y, w, Math.max(1, len / rows * 0.4));
+  }
+  c.restore();
+}
+function drawScene(c, R, A, B, t, P, now){
+  const ok = drawPano(c, R, A, 1);
+  if (ok){ if (B !== A) drawPano(c, R, B, t); }
+  else drawWorld(c, R, P, now);
+  drawLights(c, R, P, now);
+}
+
+// Фото на полароиде: квадрат из панорамы того же времени + светило на своём месте. Кешируется по (время, пиксели устройства).
+const PHOTO_CACHE = {};
+function photo(id, px){
+  px = Math.max(8, Math.round(px)); const key = id + ':' + px;
+  if (PHOTO_CACHE[key]) return PHOTO_CACHE[key];
+  const cnv = document.createElement('canvas'); cnv.width = px; cnv.height = px;
+  const c = cnv.getContext('2d');
+  if (id === 'eclipse'){
+    const g = c.createLinearGradient(0, 0, 0, px); g.addColorStop(0, '#0b0a18'); g.addColorStop(1, '#2a2040'); c.fillStyle = g; c.fillRect(0, 0, px, px);
+    const sp = IMG['sprite:eclipse']; if (sp) c.drawImage(sp, px * 0.12, px * 0.08, px * 0.76, px * 0.76);
+  } else {
+    const R = { x: 0, y: 0, w: px, h: px, hor: px * ART.CROP_HOR, cx: px / 2, rx: px * 0.44, ry: px * 0.5, sunR: px * 0.1, moonR: px * 0.085, cityH: px * 0.24, crop: ART.CROP, mini: true };
+    drawScene(c, R, id, id, 0, LP[id], 0);
+    const v = c.createRadialGradient(px / 2, px / 2, px * 0.35, px / 2, px / 2, px * 0.75);   // лёгкая виньетка плёнки
+    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.28)'); c.fillStyle = v; c.fillRect(0, 0, px, px);
+  }
+  return (PHOTO_CACHE[key] = cnv);
+}
+function rr(c, x, y, w, h, r){ c.beginPath(); c.roundRect ? c.roundRect(x, y, w, h, r) : c.rect(x, y, w, h); }
+// Полароид: рамка, квадратное фото, нижнее поле шире. dev 0..1 — проявленность (закрытый кадр — тёмная эмульсия).
+// o: scale/sx/sy — масштаб, lift — подъём (тень дальше), ring — обводка, tint — красная вспышка ошибки, veil — туча/фонарь {kind, a, t}.
+function drawPolaroid(c, cx, cy, w, rot, id, dev, o){
+  o = o || {};
+  const h = w * CFG.POLA_RATIO, m = w * 0.06, ps = w - 2 * m, lift = o.lift || 0;
+  c.save(); c.translate(cx, cy); c.rotate(rot);
+  const sx = (o.scale || 1) * (o.sx || 1), sy = (o.scale || 1) * (o.sy || 1); if (sx !== 1 || sy !== 1) c.scale(sx, sy);
+  const sh = o.shadow === undefined ? 0.28 : o.shadow;
+  c.fillStyle = 'rgba(0,0,0,' + (sh * 0.5).toFixed(3) + ')'; rr(c, -w / 2 + w * (0.05 + lift * 0.1), -h / 2 + w * (0.09 + lift * 0.2), w, h, w * 0.05); c.fill();
+  c.fillStyle = 'rgba(0,0,0,' + sh.toFixed(3) + ')'; rr(c, -w / 2 + w * 0.02, -h / 2 + w * (0.04 + lift * 0.08), w, h, w * 0.04); c.fill();
+  const pg = c.createLinearGradient(0, -h / 2, 0, h / 2); pg.addColorStop(0, '#fffdf7'); pg.addColorStop(1, '#efe9dc');
+  c.fillStyle = o.frame || pg; rr(c, -w / 2, -h / 2, w, h, w * 0.04); c.fill();
+  const px = -w / 2 + m, py = -h / 2 + m;
+  if (dev < 1){
+    const g = c.createLinearGradient(px, py, px + ps, py + ps); g.addColorStop(0, '#46403a'); g.addColorStop(1, '#221f1c');
+    c.fillStyle = g; c.fillRect(px, py, ps, ps);
+  }
+  if (dev > 0 && id){ c.globalAlpha = dev; c.drawImage(photo(id, (o.photoPx || ps) * scale * DPR), px, py, ps, ps); c.globalAlpha = 1; }
+  if (o.veil) drawVeil(c, o.veil, px, py, ps);
+  if (o.tint){ c.fillStyle = 'rgba(255,70,60,' + o.tint.toFixed(3) + ')'; c.fillRect(px, py, ps, ps); }
+  // блик глянца
+  const gl = c.createLinearGradient(px, py, px + ps, py + ps); gl.addColorStop(0, 'rgba(255,255,255,0.16)'); gl.addColorStop(0.45, 'rgba(255,255,255,0)'); gl.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = gl; c.fillRect(px, py, ps, ps);
+  c.strokeStyle = 'rgba(0,0,0,0.18)'; c.lineWidth = Math.max(0.6, w * 0.012); c.strokeRect(px, py, ps, ps);
+  if (o.ring){ c.strokeStyle = o.ring; c.lineWidth = Math.max(2, w * 0.06); rr(c, -w / 2 - 2, -h / 2 - 2, w + 4, h + 4, w * 0.06); c.stroke(); }
+  if (o.mark) drawMark(c, o.mark, 0, py + ps + (h - m - ps - m) / 2 + m * 0.5, w, o.now || 0);
+  c.restore();
+}
+// Метка на нижнем поле полароида: лампа-вспышка или капли дождя.
+function drawMark(c, kind, x, y, w, now){
+  const r = w * 0.085;
+  if (kind === 'flash'){
+    const pul = 1 + 0.15 * Math.sin(now / 220);
+    c.fillStyle = 'rgba(255,230,120,0.55)'; c.beginPath(); c.arc(x, y, r * 1.9 * pul, 0, 6.2832); c.fill();
+    c.fillStyle = '#fff6c8'; c.beginPath(); c.arc(x, y - r * 0.15, r, 0, 6.2832); c.fill();
+    c.fillStyle = '#8a7a60'; c.fillRect(x - r * 0.45, y + r * 0.7, r * 0.9, r * 0.6);
+  } else {
+    c.fillStyle = '#4a8fe0';
+    for (const dx of [-1.6, 0, 1.6]){ const yy = y + (dx === 0 ? -r * 0.4 : r * 0.2); c.beginPath(); c.moveTo(x + dx * r, yy - r); c.quadraticCurveTo(x + dx * r + r * 0.7, yy + r * 0.3, x + dx * r, yy + r * 0.6); c.quadraticCurveTo(x + dx * r - r * 0.7, yy + r * 0.3, x + dx * r, yy - r); c.fill(); }
+  }
+}
+// Завеса на фото: туча (днём расходится в стороны) или тёмный кадр с фонарём (ночью фонарь загорается, тьма уходит).
+// a — сила завесы 1..0 (0 — сошла), t — время для покачивания.
+function drawVeil(c, V, px, py, ps){
+  const a = V.a, t = V.t || 0;
+  c.save(); c.beginPath(); c.rect(px - ps * 0.25, py - ps * 0.25, ps * 1.5, ps * 1.5); c.clip();
+  if (V.kind === 'cloud'){
+    c.fillStyle = 'rgba(226,232,246,' + (0.55 * a).toFixed(3) + ')'; c.fillRect(px, py, ps, ps);
+    const sp = IMG['sprite:cloud'], cw = ps * 1.5, ch = cw * 0.55, bob = Math.sin(t / 700) * ps * 0.03, off = (1 - a) * ps * 0.7;
+    if (sp){
+      c.globalAlpha = a;
+      for (const side of [-1, 1]){
+        c.save(); c.beginPath(); c.rect(side < 0 ? px - ps : px + ps / 2, py - ps, ps * 1.5, ps * 3); c.clip();
+        c.drawImage(sp, 0, sp.height * 0.28, sp.width, sp.height * 0.46, px + ps / 2 - cw / 2 + side * off, py + ps * 0.5 - ch / 2 + bob, cw, ch);
+        c.restore();
+      }
+      c.globalAlpha = 1;
+    } else { c.fillStyle = 'rgba(255,255,255,' + (0.85 * a).toFixed(3) + ')'; for (const [dx, dy, r] of [[-0.2, 0.05, 0.22], [0.05, -0.05, 0.28], [0.25, 0.08, 0.2]]){ c.beginPath(); c.arc(px + ps * (0.5 + dx) + (dx < 0 ? -off : off), py + ps * (0.5 + dy), ps * r, 0, 6.2832); c.fill(); } }
+  } else if (V.kind === 'snow'){
+    // снег: морозная пелена и снежинки; тает — пелена уходит, снежинки падают вниз
+    c.fillStyle = 'rgba(238,246,255,' + (0.82 * a).toFixed(3) + ')'; c.fillRect(px, py, ps, ps);
+    c.strokeStyle = 'rgba(160,190,230,' + (0.9 * a).toFixed(3) + ')'; c.lineWidth = Math.max(1, ps * 0.03); c.lineCap = 'round';
+    const fall = (1 - a) * ps * 0.4;
+    for (const [fx, fy, fr] of [[0.3, 0.32, 0.13], [0.68, 0.45, 0.16], [0.42, 0.7, 0.11]]){
+      const cx = px + fx * ps, cy = py + fy * ps + fall, rr2 = fr * ps;
+      for (let i = 0; i < 3; i++){ const an = i * Math.PI / 3; c.beginPath(); c.moveTo(cx - Math.cos(an) * rr2, cy - Math.sin(an) * rr2); c.lineTo(cx + Math.cos(an) * rr2, cy + Math.sin(an) * rr2); c.stroke(); }
+    }
+  } else {
+    const lit = V.lit || 0;           // 0 — погашен, 1 — горит
+    c.fillStyle = 'rgba(10,14,30,' + (0.8 * a).toFixed(3) + ')'; c.fillRect(px, py, ps, ps);
+    const off = IMG.lanternOff, on = IMG['sprite:lantern'], lh = ps * 0.92, lw = lh * 0.5, lx = px + ps / 2 - lw / 2, ly = py + ps * 0.06;
+    const fade = clamp(a * 1.6, 0, 1);          // в конце фонарь тоже уходит, чтобы не мешать читать фото
+    if (lit > 0){
+      c.save(); c.globalCompositeOperation = 'screen';
+      const g = c.createRadialGradient(px + ps / 2, ly + lh * 0.33, 1, px + ps / 2, ly + lh * 0.33, ps * 0.6);
+      g.addColorStop(0, 'rgba(255,214,120,' + (0.9 * lit * fade).toFixed(3) + ')'); g.addColorStop(1, 'rgba(255,214,120,0)');
+      c.fillStyle = g; c.fillRect(px, py, ps, ps); c.restore();
+    }
+    if (on && off){ c.globalAlpha = fade * (1 - lit); c.drawImage(off, 0, 0, off.width, off.height, lx - lw * 0.5, ly, lw * 2, lh);
+      c.globalAlpha = fade * lit; c.drawImage(on, 0, 0, on.width, on.height, lx - lw * 0.5, ly, lw * 2, lh); c.globalAlpha = 1; }
+    else { c.fillStyle = lit > 0.5 ? '#ffd27a' : '#556'; c.fillRect(px + ps * 0.44, py + ps * 0.2, ps * 0.12, ps * 0.16); c.fillRect(px + ps * 0.48, py + ps * 0.36, ps * 0.04, ps * 0.5); }
+  }
+  c.restore();
+}
+
+// --- состояние оболочки ---
+const G = {
+  s: null,                    // состояние ядра
+  screen: 'menu',             // menu | game | help | win | lose | extra | stats
+  save: Object.assign({ level: 0, mode: CFG.MODE_DEFAULT, muted: false, best: {}, metrics: {} }, loadSave()),
+  world: null,                // переход света { a, b, from, to, t0, dur } или оборот { kf: [{ id, P }], t0, dur }
+  vfId: 'golden',             // время кадра в видоискателе (меняется, когда кадр долетел)
+  flights: [],                // летящие кадры [{ id, x0, y0, w0, rot0, t0, dur, dir }]
+  bonusFlights: [],           // кадры шкалы летят на плёнку
+  shakes: {}, reveal: {}, unveil: {},   // кадр → момент вздрагивания / открытия / снятия завесы { t0, kind }
+  parts: [], floats: [],      // искры и конфетти; всплывающие надписи
+  filmShake: 0, filmBump: 0, hintPulse: 0, flash: 0, banner: null, orbitAt: 0, orbitDir: 1, land: 0, sweep: null, streakPop: 0,
+  eclipse: { on: false, t0: -1e9 },
+  runLog: [], pipPop: {},     // времена текущего хода шкалы и момент «наполнения» каждой ячейки
+  pileHist: [], pileSeed: 1, stripShift: 0,   // кадры под верхним в стопке; разброс стопки; момент сдвига ленты при доборе
+  press: -1,                  // кадр под пальцем (приподнят)
+  ending: null,               // { at, screen } — показать экран после анимаций
+  lastInput: 0, lastAct: 0, errAt: 0,
+  lv: null,                   // метрики текущего уровня
+  fx: [],                     // открытые эффекты для журнала fx.end [{ name, until }]
+  seen: {},                   // какие подсказки уже показаны за сеанс
+  timeScale: 1, paused: false,
+};
+const nowMs = () => performance.now();
+function fxStart(name, ms, info){ G.fx.push({ name, until: nowMs() + ms / G.timeScale }); log('fx.start', name, info); }
+
+function worldAt(now){
+  const w = G.world;
+  if (!w) return { P: LP[G.vfId], a: G.vfId, b: G.vfId, t: 0 };
+  if (w.kf){
+    const t = clamp((now - w.t0) / w.dur, 0, 1), u = easeInOut(t) * (w.kf.length - 1), i = Math.min(w.kf.length - 2, Math.floor(u)), f = u - i;
+    return { P: mixP(w.kf[i].P, w.kf[i + 1].P, f), a: w.kf[i].id, b: w.kf[i + 1].id, t: f };
+  }
+  const t = easeOut(clamp((now - w.t0) / w.dur, 0, 1));
+  return { P: mixP(w.from, w.to, t), a: w.a, b: w.b, t };
+}
+// Перевести мир в время id. dir: +1 — позже (светила вперёд по дуге), -1 — раньше, 0 — кратчайшим путём.
+function lightTo(id, dir, instant){
+  const now = nowMs(), W0 = worldAt(now), cur = W0.P, L = LP[id];
+  const to = Object.assign({}, L, { sunA: unwrapTo(cur.sunA, L.sunA, dir), moonA: unwrapTo(cur.moonA, L.moonA, dir) });
+  const a = instant ? id : (W0.t > 0.5 ? W0.b : W0.a);
+  G.world = { a, b: id, from: instant ? to : cur, to, t0: now, dur: Math.max(1, CFG.WORLD_MS / G.timeScale) };
+  if (!instant){ fxStart('world', CFG.WORLD_MS, id); G.sweep = { t0: now, dir: dir || 1, col: LIGHT[id].glow }; }
+  $('frame').style.background = LIGHT[id].top;
+  try { document.querySelector('meta[name=theme-color]').setAttribute('content', LIGHT[id].top); } catch (e) {}
+}
+// «Полный день»: светила делают оборот, мир проходит все времена шкалы и возвращается в текущее.
+function orbit(dir){
+  const now = nowMs(), W0 = worldAt(now), ids = G.s.ids, V = ids.length, i0 = G.s.top;
+  const kf = [{ id: W0.b, P: W0.P }]; let prev = W0.P;
+  for (let j = 1; j <= V; j++){
+    const id = ids[(((i0 + dir * j) % V) + V) % V], L = LP[id];
+    const p = Object.assign({}, L, { sunA: unwrapTo(prev.sunA, L.sunA, dir), moonA: unwrapTo(prev.moonA, L.moonA, dir) });
+    kf.push({ id, P: p }); prev = p;
+  }
+  G.world = { kf, t0: now, dur: CFG.ORBIT_MS / G.timeScale };
+  fxStart('orbit', CFG.ORBIT_MS, 'dir=' + dir);
+}
+
+// --- звук: WebAudio-синтез без файлов, ленивый старт по первому жесту (§8) ---
+// Фон зависит от времени суток: пэд-аккорд (выше и светлее днём, ниже ночью), птицы утром, цикады днём, сверчки вечером.
+const AMB = {
+  dawn:     { notes: [72, 76, 79], pad: 1,   cut: 1400, birds: 0.8,  cic: 0,    crk: 0.15 },
+  morning:  { notes: [74, 78, 81], pad: 0.9, cut: 1800, birds: 1,    cic: 0.1,  crk: 0 },
+  late:     { notes: [76, 79, 83], pad: 0.8, cut: 2000, birds: 0.6,  cic: 0.35, crk: 0 },
+  noon:     { notes: [77, 81, 84], pad: 0.8, cut: 2200, birds: 0.3,  cic: 0.7,  crk: 0 },
+  day:      { notes: [76, 80, 83], pad: 0.8, cut: 2000, birds: 0.15, cic: 1,    crk: 0 },
+  golden:   { notes: [69, 73, 76], pad: 1,   cut: 1200, birds: 0.25, cic: 0.45, crk: 0 },
+  sunset:   { notes: [67, 70, 74], pad: 1,   cut: 1000, birds: 0.1,  cic: 0.15, crk: 0.3 },
+  dusk:     { notes: [64, 67, 71], pad: 1,   cut: 800,  birds: 0,    cic: 0,    crk: 0.7 },
+  night:    { notes: [57, 60, 64], pad: 1,   cut: 600,  birds: 0,    cic: 0,    crk: 1 },
+  midnight: { notes: [52, 55, 59], pad: 0.9, cut: 500,  birds: 0,    cic: 0,    crk: 0.5 },
+  eclipse:  { notes: [45, 52, 57], pad: 1.1, cut: 380,  birds: 0,    cic: 0,    crk: 0.2 },
+};
+const SND = { MASTER: 0.9, PAD: 0.045, CIC: 0.022, CRK: 0.018, BIRD: 0.035, SHUTTER: 0.4, NOTE: 0.09 };
+const PENTA = [0, 2, 4, 7, 9];
+const midiHz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+const sndRnd = mulberry32(4242);
+const Snd = {
+  ac: null, master: null, noise: null, pad: [], padGain: null, padFilter: null, cic: null, crk: null, birds: 0, nextBird: 0, timeId: null,
+  init(){
+    if (this.ac){ if (this.ac.state === 'suspended') try { this.ac.resume(); } catch (e) {} return; }
+    try { this.ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { this.ac = null; return; }
+    const ac = this.ac;
+    this.master = ac.createGain(); this.master.gain.value = G.save.muted ? 0 : SND.MASTER; this.master.connect(ac.destination);
+    const len = ac.sampleRate * 2, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0), nr = mulberry32(99);
+    for (let i = 0; i < len; i++) d[i] = nr() * 2 - 1;
+    this.noise = buf;
+    this.padFilter = ac.createBiquadFilter(); this.padFilter.type = 'lowpass'; this.padFilter.frequency.value = 1200;
+    this.padGain = ac.createGain(); this.padGain.gain.value = 0;
+    this.padFilter.connect(this.padGain).connect(this.master);
+    for (let i = 0; i < 3; i++){ const o = ac.createOscillator(); o.type = i === 0 ? 'triangle' : 'sine'; o.frequency.value = 220; o.detune.value = (i - 1) * 6; o.connect(this.padFilter); o.start(); this.pad.push(o); }
+    this.cic = this.amLayer(4800, 6, 38, 0);
+    const co = ac.createOscillator(); co.frequency.value = 4300; const g1 = ac.createGain(); g1.gain.value = 0.5;
+    const l1 = ac.createOscillator(); l1.type = 'square'; l1.frequency.value = 28; const l1g = ac.createGain(); l1g.gain.value = 0.5; l1.connect(l1g).connect(g1.gain);
+    const g2 = ac.createGain(); g2.gain.value = 0.5;
+    const l2 = ac.createOscillator(); l2.type = 'square'; l2.frequency.value = 1.4; const l2g = ac.createGain(); l2g.gain.value = 0.5; l2.connect(l2g).connect(g2.gain);
+    this.crk = ac.createGain(); this.crk.gain.value = 0;
+    co.connect(g1).connect(g2).connect(this.crk).connect(this.master); co.start(); l1.start(); l2.start();
+    if (this.timeId) this.setTime(this.timeId, true);
+    log('sound', 'init');
+  },
+  amLayer(freq, q, rate, level){
+    const ac = this.ac, src = ac.createBufferSource(); src.buffer = this.noise; src.loop = true;
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = freq; bp.Q.value = q;
+    const am = ac.createGain(); am.gain.value = 0.5;
+    const lfo = ac.createOscillator(); lfo.type = 'square'; lfo.frequency.value = rate; const lg = ac.createGain(); lg.gain.value = 0.5; lfo.connect(lg).connect(am.gain);
+    const out = ac.createGain(); out.gain.value = level;
+    src.connect(bp).connect(am).connect(out).connect(this.master); src.start(); lfo.start();
+    return out;
+  },
+  setTime(id, instant){
+    this.timeId = id; if (!this.ac) return;
+    const A = AMB[id], t = this.ac.currentTime, tau = instant ? 0.01 : 0.15;
+    A.notes.forEach((m, i) => this.pad[i].frequency.setTargetAtTime(midiHz(m - 12), t, tau));
+    this.padFilter.frequency.setTargetAtTime(A.cut, t, tau);
+    this.padGain.gain.setTargetAtTime(A.pad * SND.PAD, t, tau * 2);
+    this.cic.gain.setTargetAtTime(A.cic * SND.CIC, t, tau * 2);
+    this.crk.gain.setTargetAtTime(A.crk * SND.CRK, t, tau * 2);
+    this.birds = A.birds;
+  },
+  setMuted(m){ if (this.master) this.master.gain.setTargetAtTime(m ? 0 : SND.MASTER, this.ac.currentTime, 0.03); },
+  tick(now){
+    if (!this.ac || G.save.muted || G.paused || this.birds < 0.05) return;
+    if (now < this.nextBird) return;
+    this.nextBird = now + (700 + sndRnd() * 2200) / this.birds;
+    if (this.nextBird - now > 6000) return;
+    const t = this.ac.currentTime, base = 2600 + sndRnd() * 1400, n = 2 + Math.floor(sndRnd() * 3);
+    for (let i = 0; i < n; i++) this.chirp(t + i * 0.11, base * (1 + sndRnd() * 0.15), SND.BIRD * this.birds);
+  },
+  chirp(t, f, vol){
+    const o = this.ac.createOscillator(), g = this.ac.createGain();
+    o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 1.45, t + 0.06);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+    o.connect(g).connect(this.master); o.start(t); o.stop(t + 0.1);
+  },
+  tone(f, dur, type, vol, t){
+    if (!this.ac) return; t = t || this.ac.currentTime;
+    const o = this.ac.createOscillator(), g = this.ac.createGain();
+    o.type = type || 'sine'; o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(this.master); o.start(t); o.stop(t + dur + 0.02);
+  },
+  burst(t, dur, type, freq, vol){
+    const src = this.ac.createBufferSource(); src.buffer = this.noise;
+    const f = this.ac.createBiquadFilter(); f.type = type; f.frequency.value = freq;
+    const g = this.ac.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f).connect(g).connect(this.master); src.start(t, sndRnd()); src.stop(t + dur + 0.01);
+  },
+  sweep(t, dur, f0, f1, vol){
+    const src = this.ac.createBufferSource(); src.buffer = this.noise;
+    const f = this.ac.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.2; f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    const g = this.ac.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + dur * 0.3); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f).connect(g).connect(this.master); src.start(t, sndRnd()); src.stop(t + dur + 0.02);
+  },
+  // щелчок затвора + нота серии: серия звучит восходящей пентатоникой
+  shutter(streak){
+    if (!this.ac) return; const t = this.ac.currentTime;
+    this.burst(t, 0.014, 'highpass', 2600, SND.SHUTTER); this.burst(t + 0.05, 0.025, 'bandpass', 1300, SND.SHUTTER * 0.7);
+    const i = Math.max(0, (streak || 1) - 1), m = Math.min(98, 72 + 12 * Math.floor(i / 5) + PENTA[i % 5]);
+    this.tone(midiHz(m), 0.32, 'sine', SND.NOTE, t + 0.03); this.tone(midiHz(m + 12), 0.18, 'sine', SND.NOTE * 0.25, t + 0.03);
+    log('sound', 'shutter', 'streak=' + streak);
+  },
+  film(){ if (!this.ac) return; const t = this.ac.currentTime; for (let i = 0; i < 4; i++) this.burst(t + i * 0.035, 0.012, 'bandpass', 3200, 0.18); log('sound', 'film'); },
+  bad(){ if (!this.ac) return; this.tone(170, 0.14, 'triangle', 0.12); this.tone(120, 0.16, 'sine', 0.1); log('sound', 'bad'); },
+  veiled(){ if (!this.ac) return; this.tone(140, 0.12, 'sine', 0.1); this.burst(this.ac.currentTime, 0.08, 'lowpass', 600, 0.15); log('sound', 'veiled'); },
+  bonus(){ if (!this.ac) return; const t = this.ac.currentTime; this.tone(midiHz(84), 0.22, 'sine', 0.08, t); this.tone(midiHz(91), 0.3, 'sine', 0.08, t + 0.09); this.film(); log('sound', 'bonus'); },
+  unveil(kind){
+    if (!this.ac) return; const t = this.ac.currentTime;
+    if (kind === 'cloud') this.sweep(t, 0.5, 600, 3000, 0.12); else { this.tone(midiHz(88), 0.5, 'triangle', 0.06, t); this.tone(midiHz(95), 0.4, 'sine', 0.05, t + 0.06); }
+    log('sound', 'unveil', kind);
+  },
+  wild(){ if (!this.ac) return; const t = this.ac.currentTime; this.tone(55, 0.9, 'sine', 0.14, t); [57, 64, 69, 76].forEach((m, i) => this.tone(midiHz(m), 0.9, 'triangle', 0.045, t + 0.1 + i * 0.07)); log('sound', 'wild'); },
+  peak(){
+    if (!this.ac) return; const t = this.ac.currentTime, o = this.ac.createOscillator(), g = this.ac.createGain();
+    o.frequency.setValueAtTime(1800, t); o.frequency.exponentialRampToValueAtTime(5200, t + 0.16);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.03, t + 0.12); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    o.connect(g).connect(this.master); o.start(t); o.stop(t + 0.2);
+    this.burst(t + 0.17, 0.12, 'lowpass', 2500, 0.35);
+    log('sound', 'flash');
+  },
+  chime(){ if (!this.ac) return; const t = this.ac.currentTime; [88, 93, 100].forEach((m, i) => this.tone(midiHz(m), 0.5, 'sine', 0.05, t + i * 0.08)); log('sound', 'chime'); },
+  rain(){ if (!this.ac) return; this.sweep(this.ac.currentTime, 1.2, 3000, 1200, 0.08); log('sound', 'rain'); },
+  fullDay(){ if (!this.ac) return; const t = this.ac.currentTime; [0, 2, 4, 7, 9, 12, 14, 16, 19].forEach((d, i) => this.tone(midiHz(67 + d), 0.4, 'sine', 0.07, t + i * 0.11)); log('sound', 'fullday'); },
+  win(){ if (!this.ac) return; const t = this.ac.currentTime; [60, 64, 67, 72, 76].forEach((m, i) => this.tone(midiHz(m), 0.7, 'triangle', 0.08, t + i * 0.09)); log('sound', 'win'); },
+  lose(){ if (!this.ac) return; const t = this.ac.currentTime; [64, 60, 57].forEach((m, i) => this.tone(midiHz(m), 0.45, 'triangle', 0.08, t + i * 0.16)); log('sound', 'lose'); },
+};
+function buzz(ms){ try { if (navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) navigator.vibrate(ms); } catch (e) {} }   // без жеста Chrome пишет ошибку в консоль
+
+// --- экраны: DOM-оверлеи, любой открывается кодом или хешем (§6, §11) ---
+const $ = (id) => document.getElementById(id);
+function levelLabel(li){ return li === 0 ? 'Урок' : 'Уровень ' + (li + 1); }   // после 12-го уровни бесконечные, форма — генератор
+// Подсказки о новом элементе: в начале вводного уровня и при первой встрече за сеанс.
+const INTRO = {
+  gauge: 'Ходы в одну сторону копят шкалу под видоискателем: полкруга — кадр на плёнку',
+  wild: 'Затмение: к нему подходит любой кадр. Полный день даёт ещё одно',
+  cloud: 'Туча уйдёт, когда в видоискателе будет день',
+  lantern: 'Фонарь зажжётся, когда в видоискателе будет ночь',
+  star: 'Падающая звезда: появляется, когда серия ведёт в ночь. Лови — кадр на плёнку',
+  flash: 'Вспышка: кадр с лампой проявляет закрытые кадры на 3 хода',
+  order: 'Заказ: сними 3 кадра этого времени — кадр на плёнку',
+  rain: 'Дождь: после него первый дневной кадр даёт радугу — к ней подходит любой кадр',
+  snow: 'Снег тает только в полдень',
+};
+function goto(screen, payload){
+  G.screen = screen; log('screen', screen);
+  const ov = $('overlay'), card = $('card'), sv = G.save;
+  if (screen === 'game'){ ov.classList.remove('show'); return; }
+  ov.classList.add('show');
+  if (screen === 'menu'){
+    let grid = '';
+    for (let i = 0; i < LEVELS.length; i++) grid += `<button class="btn${sv.best[i] ? ' done' : ''}" data-act="lvl" data-li="${i}">${i === 0 ? 'У' : i + 1}</button>`;
+    card.innerHTML = `<h2>Золотой час</h2><p>Кадр на час раньше или позже — и над городом проходит день.</p>
+      <button class="btn primary" data-act="play">${G.s && G.s.li === sv.level && !isWin(G.s) && G.s.moves ? 'Продолжить' : 'Играть'} · ${levelLabel(sv.level)}</button>
+      <div class="grid">${grid}</div>
+      <button class="btn" data-act="lvl" data-li="${Math.max(LEVELS.length, sv.level)}">Дальше: уровень ${Math.max(LEVELS.length, sv.level) + 1} и бесконечно</button> <button class="btn" data-act="lvl" data-li="999">1000-й</button><br>
+      <div class="small">Времён в главах 6–12</div>
+      <div class="seg"><button class="btn${sv.mode === 8 ? ' on' : ''}" data-act="mode" data-m="8">8</button><button class="btn${sv.mode === 10 ? ' on' : ''}" data-act="mode" data-m="10">10</button></div><br>
+      <button class="btn" data-act="help">Как играть</button> <button class="btn" data-act="stats">Статистика</button>`;
+  }
+  if (screen === 'help') card.innerHTML = `<h2>Как играть</h2>
+    <p>Внизу видоискатель: это время сейчас. По бокам — соседние: на час раньше и на час позже.</p>
+    <p>Тапай открытый кадр с соседним временем. Тот же час не подходит. После ночи снова рассвет.</p>
+    <p>Нет хода — тапни плёнку слева. Ходы подряд в одну сторону копят шкалу: полкруга — кадр на плёнку, полный круг — Затмение.</p>
+    <p>Туча уходит днём, фонарь загорается ночью.</p>
+    <button class="btn primary" data-act="back">Понятно</button>`;
+  if (screen === 'win') card.innerHTML = `<h2>Кадры сняты!</h2><p>${payload || ''}</p>
+    <button class="btn primary" data-act="next">Дальше</button> <button class="btn" data-act="menu">Меню</button>`;
+  if (screen === 'lose') card.innerHTML = `<h2>Плёнка кончилась</h2><p>На столе осталось кадров: ${G.s.left}.</p>
+    <button class="btn primary" data-act="retry">Ещё раз</button> <button class="btn" data-act="menu">Меню</button>`;
+  if (screen === 'extra') card.innerHTML = `<h2>Почти!</h2><p>Осталось ${G.s.left} ${plural(G.s.left, 'кадр', 'кадра', 'кадров')}. Зарядить ещё плёнку?</p>
+    <button class="btn primary" data-act="extra">+${CFG.EXTRA_N} кадра</button> <button class="btn" data-act="giveup">Сдаться</button>`;
+  if (screen === 'stats') card.innerHTML = statsHtml();
+}
+function plural(n, a, b, c){ const m = n % 100, k = n % 10; return m > 10 && m < 20 ? c : k === 1 ? a : k >= 2 && k <= 4 ? b : c; }
+$('card').addEventListener('click', (e) => {
+  const el = e.target.closest ? e.target.closest('[data-act]') : null; if (!el) return;
+  const act = el.dataset.act; Snd.init(); log('input', 'button', act);
+  if (act === 'play'){ if (G.s && G.s.li === G.save.level && !isWin(G.s) && !isStuck(G.s) && G.s.moves) goto('game'); else startLevel(G.save.level); }
+  else if (act === 'lvl') startLevel(+el.dataset.li);
+  else if (act === 'retry') startLevel(G.s.li);
+  else if (act === 'next') startLevel(G.s.li + 1);
+  else if (act === 'mode'){ const m = +el.dataset.m; if (m !== G.save.mode){ G.save.mode = m; save(); if (G.lv && !G.lv.closed) closeLevel('quit'); G.s = null; log('event', 'mode', m); } goto('menu'); }
+  else if (act === 'extra') takeExtra();
+  else if (act === 'giveup'){ endLevel('lose'); }
+  else if (act === 'help') goto('help');
+  else if (act === 'stats') goto('stats');
+  else if (act === 'reset-stats'){ G.save.metrics = {}; save(); goto('stats'); }
+  else if (act === 'back') goto(G.s && G.lv && !G.lv.closed ? 'game' : 'menu');
+  else goto('menu');
+});
+window.addEventListener('hashchange', () => { const h = location.hash.slice(1), m = /^lvl(\d+)$/.exec(h); if (m) startLevel(Math.max(0, +m[1] - 1)); else if (h === 'game' && !G.s) startLevel(G.save.level); else if (h && h !== G.screen) goto(h); });
+
+let toastUntil = 0;
+function toast(msg, ms){ const t = $('toast'); t.textContent = msg; t.classList.remove('hide'); toastUntil = nowMs() + (ms || CFG.TOAST_MS); log('event', 'toast', msg); }
+function once(key, msg, ms){ if (G.seen[key]) return; G.seen[key] = 1; toast(msg, ms || CFG.INTRO_MS); }
+
+// --- метрики плейтеста: копятся в сейве по режиму (8 / 10), отдельно «все уровни» и «с 3-го» ---
+function newLv(li){ return { li, mode: G.s.V === 10 ? 10 : 8, t0: nowMs(), plays: 0, draws: 0, errSame: 0, errSkip: 0, errVeil: 0, covered: 0, firstPlayT: null, firstJuiceT: null, thinkSum: 0, thinkN: 0, closed: false, bot: false }; }
+function closeLevel(result){
+  const lv = G.lv; if (!lv || lv.closed) return; lv.closed = true;
+  if (lv.bot){ log('event', 'metrics.skip', 'бот'); return; }   // прогоны ботом из хука в статистику плейтеста не идут
+  const s = G.s, streaks = s.streaks.concat(s.streak ? [s.streak] : []);
+  const M = G.save.metrics, key = lv.mode;
+  M[key] = M[key] || {};
+  for (const bucket of ['all', lv.li >= 2 ? 'from3' : null]){
+    if (!bucket) continue;
+    const B = M[key][bucket] = M[key][bucket] || {};
+    const add = (k, v) => { B[k] = (B[k] || 0) + v; };
+    add('levels', 1); add(result === 'win' ? 'wins' : result === 'lose' ? 'losses' : 'quits', 1);
+    add('extras', s.extraUsed); add('plays', lv.plays); add('draws', lv.draws); add('errSame', lv.errSame); add('errSkip', lv.errSkip); add('errVeil', lv.errVeil); add('covered', lv.covered);
+    for (const x of streaks){ add('streakSum', x); add('streakN', 1); }
+    B.maxStreak = Math.max(B.maxStreak || 0, s.maxStreak); add('fullDays', s.fullDays); add('ms', nowMs() - lv.t0);
+    add('gaugeFrames', s.gaugeFrames); add('wildsEarned', s.wildsEarned); add('wildsUsed', s.wildsUsed);
+    if (lv.firstJuiceT !== null){ add('juiceSum', lv.firstJuiceT); add('juiceN', 1); }
+    add('thinkSum', lv.thinkSum); add('thinkN', lv.thinkN);
+  }
+  save();
+  log('event', 'metrics', JSON.stringify({ level: lv.li + 1, result, plays: lv.plays, draws: lv.draws, errSame: lv.errSame, errSkip: lv.errSkip, errVeil: lv.errVeil, juice: lv.firstJuiceT }));
+}
+function statsHtml(){
+  const M = G.save.metrics, pc = (a, b) => (b ? Math.round(100 * a / b) + '%' : '—'), f1 = (x) => (isFinite(x) ? x.toFixed(1) : '—'), z = (x) => x || 0;
+  const col = (B) => {
+    if (!B) return null;
+    const taps = z(B.plays) + z(B.errSame) + z(B.errSkip);
+    return [z(B.levels) + ' / ' + z(B.wins), z(B.extras), pc(z(B.errSame) + z(B.errSkip), taps), pc(z(B.errSame), taps), pc(z(B.errSkip), taps), z(B.errVeil),
+      pc(z(B.draws), z(B.plays) + z(B.draws)), f1(z(B.streakSum) / z(B.streakN)), z(B.maxStreak), z(B.fullDays), z(B.gaugeFrames), z(B.wildsEarned) + ' / ' + z(B.wildsUsed),
+      f1((taps + z(B.draws)) / (z(B.ms) / 60000)), B.thinkN ? f1(B.thinkSum / B.thinkN) + ' с' : '—', B.juiceN ? f1(B.juiceSum / B.juiceN) + ' с' : '—'];
+  };
+  const rows = ['уровней / побед', 'взято «+3»', 'ошибочных тапов', '… тот же час', '… через ступень', 'тапов по тучам и фонарям', 'доборы, % ходов', 'средняя серия', 'лучшая серия',
+    '«Полный день»', 'кадров со шкалы', 'затмений: получено / потрачено', 'тапов в минуту', 'пауза перед ходом', 'до сочного события'];
+  const cols = [['8<br>с 3-го', M[8] && M[8].from3], ['10<br>с 3-го', M[10] && M[10].from3], ['8<br>все', M[8] && M[8].all]].map(([h, B]) => [h, col(B)]).filter(x => x[1]);
+  if (!cols.length) return `<h2>Статистика</h2><p>Пока пусто — сыграй пару уровней.</p><button class="btn primary" data-act="back">Назад</button>`;
+  let html = '<table><tr><td></td>' + cols.map(c => '<td><b>' + c[0] + '</b></td>').join('') + '</tr>';
+  rows.forEach((r, i) => { html += '<tr><td>' + r + '</td>' + cols.map(c => '<td>' + c[1][i] + '</td>').join('') + '</tr>'; });
+  html += '</table>';
+  return `<h2>Статистика</h2><p class="small">Ошибочный тап — открытый кадр не того времени. Пауза — от прошлого действия до верного тапа. Сочное событие — серия ${CFG.JUICE_STREAK}, кадр со шкалы, снятый пик или «Полный день».</p>${html}
+    <button class="btn primary" data-act="back">Назад</button> <button class="btn" data-act="reset-stats">Сбросить</button>`;
+}
+
+// --- уровень ---
+function startLevel(li){
+  if (G.lv && !G.lv.closed) closeLevel('quit');
+  G.s = createState(li, G.save.mode); G.save.level = li; save();
+  G.vfId = G.s.ids[G.s.top];
+  lightTo(G.vfId, 0, true); Snd.setTime(G.vfId, true);
+  G.flights = []; G.bonusFlights = []; G.shakes = {}; G.reveal = {}; G.unveil = {}; G.parts = []; G.floats = [];
+  G.filmShake = 0; G.filmBump = 0; G.hintPulse = 0; G.flash = 0; G.banner = null; G.orbitAt = 0; G.ending = null; G.land = 0; G.sweep = null; G.streakPop = 0;
+  G.eclipse = { on: false, t0: -1e9 }; G.rainFx = { on: false, t0: -1e9 }; G.rainbowFx = { on: false, t0: -1e9 }; G.revealT = -1e9; G.starFx = null; G.orderFx = null; G.runLog = []; G.pipPop = {}; G.press = -1; G.pileHist = []; G.pileSeed = li * 7 + 1; G.stripShift = 0;
+  G.lastInput = G.lastAct = nowMs(); G.errAt = 0;
+  G.lv = newLv(li);
+  geomCache = null;
+  const L = LEVELS[li] || {}, intro = L.intro || G.s.intro;
+  if (intro) toast(INTRO[intro], CFG.INTRO_MS);
+  log('event', 'level.start', 'level=' + (li + 1) + ' layout=' + G.s.lay.name + ' times=' + G.s.V + ' tiles=' + G.s.lay.n + ' film=' + G.s.stock.length + ' veils=' + G.s.veil.filter(Boolean).length + ' wilds=' + G.s.wilds);
+  goto('game'); hud();
+}
+function hud(){
+  const s = G.s;
+  $('hud-level').textContent = s ? (s.li ? (s.li + 1) + ' · ' + s.lay.title + ' · ' + s.V + ' врем.' : 'Урок') : 'Золотой час';
+  $('ico-mute').innerHTML = G.save.muted ? '<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9l5 6M22 9l-5 6"/>' : '<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>';
+}
+// Искры цвета нового света из точки снятого кадра; конфетти из мини-кадров на «Полном дне» и победе.
+function burst(x, y, col, n, spd){
+  const now = nowMs();
+  for (let i = 0; i < n; i++){ const a = fxRnd() * 6.2832, v = (0.4 + fxRnd() * 0.8) * spd; G.parts.push({ kind: 'spark', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - spd * 0.3, g: 0.0004, t0: now, life: 500 + fxRnd() * 400, size: 1.5 + fxRnd() * 2.5, col }); }
+}
+function confetti(n){
+  const now = nowMs(), ids = G.s.ids;
+  for (let i = 0; i < n; i++) G.parts.push({ kind: 'photo', id: ids[i % ids.length], x: fxRnd() * W, y: -30 - fxRnd() * 120, vx: (fxRnd() - 0.5) * 0.06, vy: 0.12 + fxRnd() * 0.12, g: 0.00012,
+    t0: now + fxRnd() * 500, life: CFG.CONFETTI_MS, size: 14 + fxRnd() * 10, rot: fxRnd() * 6.28, vr: (fxRnd() - 0.5) * 0.008 });
+}
+function floatText(text, x, y, col){ G.floats.push({ text, x, y, t0: nowMs(), dur: 1100, col: col || '#fff6d8' }); }
+function tapTile(k){
+  const s = G.s, now = nowMs(), kind = classify(s, k);
+  if (kind === 'gone') return;
+  if (kind === 'covered'){ G.lv.covered++; G.shakes[k] = now; log('input', 'tap.covered', 'k=' + k); return; }
+  if (kind === 'veiled'){
+    G.lv.errVeil++; G.shakes[k] = now; Snd.veiled(); buzz(10);
+    toast(INTRO[s.veil[k]]); log('input', 'tap.veiled', s.veil[k] + ' k=' + k); return;
+  }
+  if (kind !== 'ok'){
+    if (kind === 'same') G.lv.errSame++; else G.lv.errSkip++;
+    G.shakes[k] = now; G.hintPulse = now; G.errAt = now; Snd.bad(); buzz(12);
+    fxStart('shake', CFG.SHAKE_MS, 'k=' + k);
+    log('input', 'tap.bad', kind + ' k=' + k + ' ' + s.ids[s.tab[k]] + ' на ' + s.ids[s.top]);
+    return;
+  }
+  const g = tileGeom(k), wasWild = s.wildTop, vb = s.veil.slice(), ev = step(s, k), id = s.ids[ev.v];
+  if (!ev.wasWild) G.runLog = s.dirRun === 0 ? [] : s.dirRun === 1 ? [id] : G.runLog.concat([id]).slice(-s.dirRun);
+  if (s.dirRun > 0) G.pipPop[s.dirRun - 1] = now;
+  if (ev.fullDay) G.runLog = [];
+  G.flights.push({ id, x0: g.x, y0: g.y, w0: g.w, rot0: g.rot, t0: now, dur: (CFG.LIFT_MS + CFG.FLIGHT_MS) / G.timeScale, dir: ev.dir || 1 });
+  fxStart('flight', CFG.LIFT_MS + CFG.FLIGHT_MS, id);
+  if (wasWild){ if (G.eclipse.on) G.eclipse = { on: false, t0: now }; if (G.rainbowFx.on) G.rainbowFx = { on: false, t0: now }; Snd.setTime(id); }
+  lightTo(id, ev.dir); Snd.setTime(id); Snd.shutter(ev.streak); buzz(8);
+  burst(g.x, g.y, hex(LIGHT[id].glow), 12, 0.22);
+  G.streakPop = now;
+  for (const x of ev.revealed) G.reveal[x] = now;
+  afterVeils(ev.cleared, vb, now);
+  const lv = G.lv; lv.plays++;
+  if (G.lastAct){ lv.thinkSum += Math.min(15000, now - G.lastAct) / 1000; lv.thinkN++; }   // пауза от прошлого действия: долгие паузы = порядок вычисляют
+  if (lv.firstPlayT === null) lv.firstPlayT = (now - lv.t0) / 1000;
+  if (ev.peak){ G.flash = now; Snd.peak(); fxStart('flash', CFG.FLASH_MS, 'k=' + k); log('event', 'peak', 'peaks=' + s.peaks); }
+  elementEvents(ev, now, g);
+  if (ev.gaugeFrame){
+    G.bonusFlights.push({ t0: now + CFG.FLIGHT_MS / G.timeScale, dur: CFG.BONUS_MS / G.timeScale });
+    setTimeout(() => Snd.bonus(), CFG.FLIGHT_MS);
+    fxStart('bonus', CFG.FLIGHT_MS + CFG.BONUS_MS, 'film=' + s.stock.length);
+    log('event', 'gauge.frame', 'run=' + s.dirRun + ' film=' + s.stock.length);
+    once('gauge', INTRO.gauge);
+  }
+  if (ev.fullDay){
+    const d = CFG.ORBIT_DELAY_MS / G.timeScale;
+    G.orbitAt = now + d; G.orbitDir = ev.dir; G.banner = { text: 'Полный день!', sub: ev.wildEarned ? '+ Затмение' : '', t0: now + d };
+    setTimeout(() => { Snd.fullDay(); if (G.s === s) confetti(26); }, CFG.ORBIT_DELAY_MS);
+    log('event', 'fullday', 'dir=' + ev.dir + ' wild=' + ev.wildEarned);
+    if (ev.wildEarned){ log('event', 'wild.earn', 'wilds=' + s.wilds); setTimeout(() => once('wild', INTRO.wild), CFG.ORBIT_MS); }
+  }
+  if (lv.firstJuiceT === null && (ev.peak || ev.fullDay || ev.gaugeFrame || ev.streak >= CFG.JUICE_STREAK)) lv.firstJuiceT = +((now - lv.t0) / 1000).toFixed(2);
+  log('input', 'play', 'k=' + k + ' ' + id + ' dir=' + ev.dir + ' streak=' + ev.streak + (wasWild ? ' wild' : ''));
+  afterAction();
+}
+// События механик после хода: звезда, вспышка, дождь и радуга, заказ.
+function elementEvents(ev, now, g){
+  const s = G.s;
+  if (ev.starGone && G.starFx){ G.starFx.goneAt = now; log('event', 'star.gone'); }
+  if (ev.starSpawn){ const r = mulberry32(s.moves * 31 + s.li); G.starFx = { t0: now, x0: 70 + r() * 200, y0: horizonY() * (0.42 + r() * 0.2), goneAt: 0 }; Snd.chime(); fxStart('star', 600); log('event', 'star.spawn', 'left=' + s.starsLeft); }
+  if (ev.flash){ G.flash = now; G.revealT = now; Snd.peak(); fxStart('reveal', 400); log('event', 'flash', 'until=' + s.revealUntil); }
+  if (ev.rainStart){ G.rainFx = { on: true, t0: now }; Snd.rain(); log('event', 'rain'); }
+  if (ev.rainbow){ G.rainFx = { on: false, t0: now }; G.rainbowFx = { on: true, t0: now }; Snd.fullDay(); floatText('Радуга!', 200, horizonY() * 0.6, '#fff6d8'); log('event', 'rainbow'); }
+  if (ev.orderDone){
+    const Pg = panelGeom(), T = orderGeom();
+    G.orderFx = { t0: now, v: ev.orderDone.v };
+    G.bonusFlights.push({ t0: now + 150, dur: CFG.BONUS_MS / G.timeScale, x0: T.x, y0: T.y });
+    setTimeout(() => Snd.bonus(), 150); log('event', 'order.done', s.ids[ev.orderDone.v] + ' +' + ev.orderDone.n);
+  }
+}
+function tapStar(){
+  const s = G.s, now = nowMs(), F = G.starFx; if (!C_canStar()) return;
+  const p = starPos(now), ev = step(s, 'star');
+  G.bonusFlights.push({ t0: now, dur: CFG.BONUS_MS / G.timeScale, x0: p.x, y0: p.y });
+  burst(p.x, p.y, [255, 240, 180], 16, 0.25); Snd.bonus(); buzz([8, 20, 8]);
+  G.starFx = null; log('input', 'star', 'film=' + s.stock.length);
+}
+const C_canStar = () => G.s && canStar(G.s);
+function starPos(now){
+  const F = G.starFx; if (!F) return { x: -99, y: -99 };
+  const t = (now - F.t0) / 1000; return { x: F.x0 + t * 6, y: F.y0 + t * 2.5 };   // медленно падает наискосок
+}
+function afterVeils(cleared, vb, now){                 // vb — завесы до хода: ядро уже сняло их, а вид нужен для анимации
+  if (!cleared || !cleared.length) return;
+  for (const k of cleared) G.unveil[k] = { t0: now, kind: vb[k] };
+  Snd.unveil(vb[cleared[0]]);
+  fxStart('unveil', CFG.UNVEIL_MS, 'n=' + cleared.length);
+  log('event', 'unveil', cleared.map(k => vb[k] + ':' + k).join(' '));
+}
+function tapFilm(){
+  const s = G.s, now = nowMs();
+  if (!s.stock.length){ G.filmShake = now; return; }
+  if ((LEVELS[s.li] || {}).tutorial && playable(s).length){ G.filmShake = now; G.errAt = now; log('input', 'film.blocked'); return; }   // урок: плёнка — только когда хода нет
+  const wasWild = s.wildTop, wasRainbow = s.wildKind === 'rainbow', vb = s.veil.slice(), ev = step(s, 'draw'), id = s.ids[ev.v];
+  if (wasRainbow) G.rainbowFx = { on: false, t0: now };
+  G.runLog = []; G.pipPop = {};
+  const Pg = panelGeom(); G.stripShift = now;
+  G.flights.push({ id, x0: Pg.strip.x + Pg.strip.fw / 2, y0: Pg.strip.y + Pg.strip.h / 2, w0: Pg.strip.fw, rot0: -0.2, t0: now, dur: CFG.FLIGHT_MS / G.timeScale, dir: 1, fromFilm: true });
+  fxStart('flight', CFG.FLIGHT_MS, id);
+  if (wasWild) G.eclipse = { on: false, t0: now };
+  lightTo(id, 0); Snd.setTime(id); Snd.film(); G.filmBump = now;
+  afterVeils(ev.cleared, vb, now); elementEvents(ev, now);
+  G.lv.draws++;
+  log('input', 'draw', id + ' broke=' + ev.broke + ' film=' + s.stock.length);
+  afterAction();
+}
+function tapWild(){
+  const s = G.s, now = nowMs();
+  if (!canWild(s)){ if (s.wilds > 0 && s.wildTop) toast('Затмение уже в видоискателе — тапни любой кадр'); return; }
+  const ev = step(s, 'wild');
+  if (ev && ev.starGone) elementEvents(ev, now);
+  G.eclipse = { on: true, t0: now }; G.vfId = 'eclipse'; G.land = now; Snd.wild(); Snd.setTime('eclipse'); buzz([10, 30, 10]);
+  const B = panelGeom().wild; burst(B.x, B.y, [255, 210, 130], 18, 0.25);
+  fxStart('eclipse', CFG.WORLD_MS, 'wilds=' + s.wilds);
+  log('input', 'wild', 'left=' + s.wilds);
+  afterAction();
+}
+function afterAction(){
+  const s = G.s, now = nowMs(); G.lastAct = now; hud();
+  if (isWin(s)){ G.ending = { at: now + CFG.END_DELAY_MS / G.timeScale, screen: 'win' }; log('event', 'level.clear', 'moves=' + s.moves); setTimeout(() => { if (G.s === s) confetti(34); }, CFG.FLIGHT_MS); }
+  else if (canExtra(s)){ G.ending = { at: now + CFG.END_DELAY_MS / G.timeScale, screen: 'extra' }; log('event', 'extra.offer', 'left=' + s.left); }
+  else if (isLose(s)) G.ending = { at: now + CFG.END_DELAY_MS / G.timeScale, screen: 'lose' };
+}
+function takeExtra(){ const ev = step(G.s, 'extra'); if (!ev) return goto('game'); G.filmBump = nowMs(); log('event', 'extra.take', 'n=' + ev.n); goto('game'); hud(); }
+function endLevel(result){
+  const s = G.s;
+  if (result === 'win'){
+    const li = s.li, stars = s.stock.length >= 3 ? 3 : s.stock.length >= 1 ? 2 : 1;
+    G.save.best[li] = Math.max(G.save.best[li] || 0, stars); G.save.level = li + 1;
+    closeLevel('win'); Snd.win(); buzz([20, 40, 20]);
+    log('event', 'level.win', 'level=' + (li + 1) + ' stars=' + stars + ' film=' + s.stock.length);
+    goto('win', ['лучшая серия ' + s.maxStreak, s.gaugeFrames ? 'кадров со шкалы ' + s.gaugeFrames : '', s.fullDays ? '«Полный день» ×' + s.fullDays : '', 'плёнки осталось ' + s.stock.length].filter(Boolean).join(' · '));
+  } else {
+    closeLevel('lose'); Snd.lose();
+    log('event', 'level.lose', 'level=' + (s.li + 1) + ' left=' + s.left);
+    goto('lose');
+  }
+}
+
+// --- геометрия экрана (виртуальные юниты, ширина VW) ---
+const cv = $('cv'), ctx = cv.getContext('2d');
+const VW = 400;
+let scale = 1, W = VW, H = 700, DPR = 1, geomCache = null;
+function horizonY(){ return Math.round(clamp(H * CFG.HORIZON_FRAC, 190, 360)); }
+// Позиции кадров на столе: ширина из ширины кадра, ряды с перекрытием, поле между горизонтом и панелью.
+function fieldGeom(){
+  if (geomCache && geomCache.W === W && geomCache.H === H && geomCache.lay === G.s.lay) return geomCache;
+  const lay = G.s.lay, span = lay.width;
+  let pitch = Math.min(CFG.TILE_MAX + CFG.TILE_GAP, (VW - 2 * CFG.SIDE) / span);
+  const top0 = horizonY() + 16, bot0 = panelGeom().top - 16, avail = bot0 - top0;
+  const fh = (p) => (p - CFG.TILE_GAP) * CFG.POLA_RATIO * (1 + lay.height * CFG.ROW_STEP);
+  if (fh(pitch) > avail) pitch = CFG.TILE_GAP + avail / (CFG.POLA_RATIO * (1 + lay.height * CFG.ROW_STEP));
+  const tw = pitch - CFG.TILE_GAP, th = tw * CFG.POLA_RATIO, rowStep = th * CFG.ROW_STEP, h = th + lay.height * rowStep;
+  const y0 = top0 + (avail - h) * 0.4, x0 = (VW - span * pitch) / 2;
+  const tiles = lay.x.map((x, k) => ({ x: x0 + (x + 0.5) * pitch, y: y0 + lay.y[k] * rowStep + th / 2, w: tw, h: th,
+    rot: (mulberry32(31 + k * 7)() - 0.5) * 2 * CFG.TILE_ROT_DEG * Math.PI / 180 }));
+  return (geomCache = { W, H, lay, tiles, tw, th });
+}
+function tileGeom(k){ return fieldGeom().tiles[k]; }
+// Кадр под пальцем: перебор спереди назад (по глубине); открытым кадрам — запас по краям.
+function tileAt(p){
+  const s = G.s, F = fieldGeom(), lay = s.lay;
+  for (let i = lay.order.length - 1; i >= 0; i--){
+    const k = lay.order[i]; if (!s.present[k]) continue;
+    const T = F.tiles[k], pad = s.cover[k] ? 0 : 4;
+    if (Math.abs(p.x - T.x) <= T.w / 2 + pad && Math.abs(p.y - T.y) <= T.h / 2 + pad) return k;
+  }
+  return -1;
+}
+
+// --- ввод: Pointer Events, порог тап/драг 10 px, pointercancel = pointerup (§3) ---
+let down = null;
+function toVirtual(e){ const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / scale, y: (e.clientY - r.top) / scale }; }
+cv.addEventListener('pointerdown', (e) => {
+  Snd.init(); down = toVirtual(e); down.id = e.pointerId; try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+  if (G.s && G.screen === 'game' && !G.ending){ const k = tileAt(down); G.press = k >= 0 && isOpen(G.s, k) ? k : -1; G.pressT = nowMs(); }
+});
+function onUp(e){
+  if (!down || e.pointerId !== down.id) return;
+  const p = toVirtual(e), moved = Math.hypot(p.x - down.x, p.y - down.y) > 10 / scale;
+  down = null; G.press = -1;
+  if (moved || e.type === 'pointercancel') return;
+  handleTap(p);
+}
+cv.addEventListener('pointerup', onUp); cv.addEventListener('pointercancel', onUp);
+function handleTap(p){
+  if (!G.s || G.screen !== 'game' || G.ending) return;
+  G.lastInput = nowMs();
+  const Pg = panelGeom(), F = Pg.film, B = Pg.wild;
+  if (C_canStar() && G.starFx){ const sp = starPos(nowMs()); if (Math.hypot(p.x - sp.x, p.y - sp.y) <= 48) return tapStar(); }
+  if (p.x >= F.x - 6 && p.x <= F.x + F.w + 6 && p.y >= F.y - 6 && p.y <= F.y + F.h + 6) return tapFilm();
+  if (G.s.wilds > 0 && Math.hypot(p.x - B.x, p.y - B.y) <= B.r + 10) return tapWild();
+  const k = tileAt(p); if (k >= 0) tapTile(k);
+}
+document.addEventListener('keydown', (e) => {          // дубли на клавиатуру для отладки (§3)
+  if (!G.s || G.screen !== 'game'){ if (e.key === 'm') goto('menu'); return; }
+  if (e.key === ' ' || e.key === 'd'){ e.preventDefault(); G.lastInput = nowMs(); tapFilm(); }
+  else if (e.key === 'w'){ G.lastInput = nowMs(); tapWild(); }
+  else if (e.key >= '0' && e.key <= '9'){ const ex = exposed(G.s).sort((a, b) => tileGeom(a).x - tileGeom(b).x), i = e.key === '0' ? 9 : +e.key - 1; if (ex[i] !== undefined){ G.lastInput = nowMs(); tapTile(ex[i]); } }
+  else if (e.key === 'a') GOLDEN.step();
+  else if (e.key === 'r') startLevel(G.s.li);
+  else if (e.key === 'm') goto('menu');
+});
+$('btn-reset').onclick = () => { Snd.init(); log('input', 'button', 'reset'); if (G.s) startLevel(G.s.li); };
+$('btn-menu').onclick = () => { Snd.init(); log('input', 'button', 'menu'); goto('menu'); };
+$('btn-mute').onclick = () => { G.save.muted = !G.save.muted; save(); Snd.init(); Snd.setMuted(G.save.muted); hud(); log('input', 'button', 'mute=' + G.save.muted); };
+
+// --- размер: resize + orientationchange + периодический пересчёт (§2) ---
+function fit(){
+  const r = $('game').getBoundingClientRect(); if (!r.width || !r.height) return;
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  scale = r.width / VW; W = VW; H = r.height / scale;
+  const cw = Math.round(r.width * DPR), ch = Math.round(r.height * DPR);
+  if (cv.width !== cw || cv.height !== ch){ cv.width = cw; cv.height = ch; }
+}
+let fitTimer = 0;
+const refit = () => { clearTimeout(fitTimer); fitTimer = setTimeout(fit, 140); };
+window.addEventListener('resize', refit); window.addEventListener('orientationchange', refit);
+setInterval(fit, 800);
+document.addEventListener('visibilitychange', () => {
+  G.paused = document.hidden; log('event', G.paused ? 'pause' : 'resume');
+  if (Snd.ac) try { G.paused ? Snd.ac.suspend() : Snd.ac.resume(); } catch (e) {}
+});
+
+// --- рендер ---
+function bigR(){ const hor = horizonY(); return { x: 0, y: 0, w: W, h: H, hor, cx: W / 2, rx: W * 0.46, ry: hor - 70, sunR: 21, moonR: 16, cityH: 78, crop: [0, 1], mini: false }; }
+function render(){
+  const now = nowMs();
+  ctx.setTransform(DPR * scale, 0, 0, DPR * scale, 0, 0);
+  if (G.sheet) return drawSheet();
+  if (G.gallery) return drawGallery(G.gallery);
+  if (G.orbitAt && now >= G.orbitAt){ G.orbitAt = 0; orbit(G.orbitDir); }
+  const R = bigR(), Wd = worldAt(now);
+  drawScene(ctx, R, Wd.a, Wd.b, Wd.t, Wd.P, now);
+  drawSweep(now, R);
+  drawWeather(now, R);
+  drawEclipseFx(now, R);
+  if (G.s){ drawField(now); drawPanel(now); drawOrderTag(now); drawStar(now); drawFlights(now); drawParts(now); drawHint(now); drawFx(now); }
+  // журнал окончания эффектов
+  for (let i = G.fx.length - 1; i >= 0; i--) if (G.fx[i].until <= now){ log('fx.end', G.fx[i].name); G.fx.splice(i, 1); }
+  if (G.ending && now >= G.ending.at && !G.flights.length){ const scr = G.ending.screen; G.ending = null; if (scr === 'win') endLevel('win'); else if (scr === 'lose') endLevel('lose'); else goto(scr); }
+  if (toastUntil && now > toastUntil){ $('toast').classList.add('hide'); toastUntil = 0; }
+  Snd.tick(now);
+}
+// Полоса света пробегает по небу в сторону хода — «таймлапс».
+function drawSweep(now, R){
+  const S = G.sweep; if (!S) return;
+  const t = (now - S.t0) / (CFG.WORLD_MS * 1.6 / G.timeScale); if (t >= 1){ G.sweep = null; return; }
+  const e = easeInOut(t), x = S.dir > 0 ? -120 + e * (W + 240) : W + 120 - e * (W + 240);
+  ctx.save(); ctx.globalCompositeOperation = 'screen';
+  const g = ctx.createLinearGradient(x - 90, 0, x + 90, 0), a = 0.22 * Math.sin(t * Math.PI);
+  g.addColorStop(0, rgba(S.col, 0)); g.addColorStop(0.5, rgba(S.col, a)); g.addColorStop(1, rgba(S.col, 0));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, R.hor + (H - R.hor) * 0.4); ctx.restore();
+}
+// Дождь (пока ждёт дневного кадра) — косые струи над заливом; радуга — дуга через небо, пока к ней подходит любой кадр.
+const RAIN_DROPS = (() => { const r = mulberry32(919), out = []; for (let i = 0; i < 90; i++) out.push({ x: r(), y: r(), l: 8 + r() * 10, s: 0.6 + r() * 0.6 }); return out; })();
+function drawWeather(now, R){
+  const s = G.s; if (!s) return;
+  const ra = G.rainFx.on ? clamp((now - G.rainFx.t0) / 500, 0, 1) : 1 - clamp((now - G.rainFx.t0) / 500, 0, 1);
+  if (ra > 0.01){
+    ctx.fillStyle = 'rgba(40,50,70,' + (0.18 * ra).toFixed(3) + ')'; ctx.fillRect(0, 0, W, R.hor + 40);
+    ctx.strokeStyle = 'rgba(210,225,245,' + (0.5 * ra).toFixed(3) + ')'; ctx.lineWidth = 1.2;
+    for (const d of RAIN_DROPS){ const y = ((d.y * H + now * 0.6 * d.s) % (H * 0.75)), x = d.x * W - y * 0.25; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - d.l * 0.25, y + d.l); ctx.stroke(); }
+  }
+  const rb = G.rainbowFx.on ? clamp((now - G.rainbowFx.t0) / 700, 0, 1) : 1 - clamp((now - G.rainbowFx.t0) / 600, 0, 1);
+  if (rb > 0.01){
+    const cols = ['#ff5a4e', '#ff9f3a', '#ffe14a', '#5fd36a', '#4aa8ff', '#7a5cff'], cx = W / 2, cy = R.hor + 30, r0 = W * 0.62;
+    ctx.save(); ctx.globalAlpha = 0.55 * rb; ctx.lineWidth = 7;
+    cols.forEach((c, i) => { ctx.strokeStyle = c; ctx.beginPath(); ctx.arc(cx, cy, r0 - i * 7, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke(); });
+    ctx.restore();
+  }
+}
+// Падающая звезда: искрящаяся звезда с хвостом медленно падает по небу; в последнее действие мигает; тап — поймать.
+function drawStar(now){
+  const F = G.starFx; if (!F || !G.s) return;
+  let a = 1; if (F.goneAt){ a = 1 - (now - F.goneAt) / 400; if (a <= 0){ G.starFx = null; return; } }
+  else if (G.s.star && G.s.star.left === 1) a = 0.55 + 0.45 * Math.abs(Math.sin(now / 120));
+  const p = starPos(now), r = 12 + 2.5 * Math.sin(now / 160);
+  ctx.save(); ctx.globalAlpha = a; ctx.globalCompositeOperation = 'lighter';
+  const tr = ctx.createLinearGradient(p.x - 70, p.y - 32, p.x, p.y); tr.addColorStop(0, 'rgba(255,240,190,0)'); tr.addColorStop(1, 'rgba(255,240,190,0.7)');
+  ctx.strokeStyle = tr; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(p.x - 70, p.y - 32); ctx.lineTo(p.x, p.y); ctx.stroke();
+  const g = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, r * 3); g.addColorStop(0, 'rgba(255,248,210,0.95)'); g.addColorStop(1, 'rgba(255,220,140,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, r * 3, 0, 6.2832); ctx.fill();
+  ctx.fillStyle = '#fffbe8'; ctx.beginPath();
+  for (let i = 0; i < 8; i++){ const an = i * Math.PI / 4 + now / 900, rr2 = i % 2 ? r * 0.38 : r * 1.25; ctx.lineTo(p.x + Math.cos(an) * rr2, p.y + Math.sin(an) * rr2); }
+  ctx.closePath(); ctx.fill(); ctx.restore();
+}
+// Заказ: бумажный ярлык под шапкой справа — мини-кадр времени и клетки прогресса; выполнен — улетает на плёнку.
+function orderGeom(){ return { x: VW - 62, y: 76, w: 104, h: 44 }; }
+function drawOrderTag(now){
+  const s = G.s, T = orderGeom(), F = G.orderFx;
+  if (F && now - F.t0 < 500){ const t = (now - F.t0) / 500; ctx.save(); ctx.globalAlpha = 1 - t; ctx.translate(T.x, T.y - 20 * t); chalkText('+1 кадр', 0, 0, 15); ctx.restore(); }
+  if (!s.order) return;
+  const o = s.order, slide = F && now - F.t0 < 900 ? easeOutBack(clamp((now - F.t0 - 400) / 500, 0, 1)) : 1;
+  ctx.save(); ctx.translate(T.x + (1 - slide) * 140, T.y); ctx.rotate(-0.04);
+  ctx.fillStyle = 'rgba(0,0,0,0.25)'; rr(ctx, -T.w / 2 + 2, -T.h / 2 + 3, T.w, T.h, 6); ctx.fill();
+  ctx.fillStyle = '#fbf3df'; rr(ctx, -T.w / 2, -T.h / 2, T.w, T.h, 6); ctx.fill();
+  ctx.fillStyle = '#c0392b'; ctx.beginPath(); ctx.arc(-T.w / 2 + 8, -T.h / 2 + 8, 3, 0, 6.2832); ctx.fill();   // кнопка-булавка
+  ctx.drawImage(photo(s.ids[o.v], 30 * scale * DPR), -T.w / 2 + 12, -15, 30, 30);
+  for (let i = 0; i < o.need; i++){ const x = -T.w / 2 + 52 + i * 16, done = i < o.got;
+    ctx.fillStyle = done ? '#e0a82e' : 'rgba(80,60,40,0.25)'; ctx.beginPath(); ctx.arc(x, 0, 6, 0, 6.2832); ctx.fill();
+    if (done){ ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 3, 0); ctx.lineTo(x - 0.5, 3); ctx.lineTo(x + 3.5, -3); ctx.stroke(); } }
+  ctx.restore();
+}
+
+// «Затмение»: мир темнеет, в зените — чёрное солнце с короной.
+function eclipseAmount(now){ const E = G.eclipse, t = clamp((now - E.t0) / (CFG.WORLD_MS * 1.2), 0, 1); return E.on ? t : 1 - t; }
+function drawEclipseFx(now, R){
+  const e = eclipseAmount(now); if (e <= 0.001) return;
+  ctx.fillStyle = 'rgba(6,6,18,' + (0.62 * e).toFixed(3) + ')'; ctx.fillRect(0, 0, W, H);
+  const sp = IMG['sprite:eclipse'], p = arcPos(R, 90), sz = 92 * (0.8 + 0.2 * e) * (1 + 0.03 * Math.sin(now / 300));
+  ctx.save(); ctx.globalAlpha = e; ctx.translate(p.x, p.y + 10); ctx.rotate(now / 4000);
+  if (sp) ctx.drawImage(sp, -sz / 2, -sz / 2, sz, sz); else { ctx.fillStyle = '#ffd890'; ctx.beginPath(); ctx.arc(0, 0, sz * 0.32, 0, 6.2832); ctx.fill(); ctx.fillStyle = '#05050c'; ctx.beginPath(); ctx.arc(0, 0, sz * 0.25, 0, 6.2832); ctx.fill(); }
+  ctx.restore();
+}
+function drawField(now){
+  const s = G.s, F = fieldGeom(), lay = s.lay;
+  for (const k of lay.order){
+    if (!s.present[k]) continue;
+    const T = F.tiles[k], open = s.cover[k] === 0;
+    let dev = open ? 1 : 0, sc = 1, dx = 0, tint = 0, lift = 0;
+    if (open && G.reveal[k] !== undefined){ const t = clamp((now - G.reveal[k]) / (CFG.REVEAL_MS / G.timeScale), 0, 1); dev = t; sc = 1 + 0.07 * Math.sin(Math.min(1, t * 1.6) * Math.PI); }
+    if (G.shakes[k] !== undefined){ const t = (now - G.shakes[k]) / (CFG.SHAKE_MS / G.timeScale); if (t < 1){ dx = Math.sin(t * 28) * 3.2 * (1 - t); tint = classify(s, k) === 'covered' ? 0 : 0.3 * (1 - t); } else delete G.shakes[k]; }
+    if (G.press === k){ sc *= 1.07; lift = 0.6; }
+    if (!open && isRevealed(s)) dev = 0.7 * clamp((now - G.revealT) / 300, 0, 1);       // вспышка проявила закрытые кадры
+    let veil = null;
+    if (s.veil[k]) veil = { kind: s.veil[k], a: 1, t: now + k * 300, lit: 0 };
+    else if (G.unveil[k]){ const U = G.unveil[k], t = (now - U.t0) / (CFG.UNVEIL_MS / G.timeScale); if (t < 1) veil = { kind: U.kind, a: 1 - easeOut(t), t: now, lit: clamp(t * 3, 0, 1) }; else delete G.unveil[k]; }
+    drawPolaroid(ctx, T.x + dx, T.y - lift * 3, T.w, T.rot, s.ids[s.tab[k]], dev, { shadow: open ? 0.3 : 0.2, scale: sc, lift, tint, veil: open ? veil : null,
+      mark: s.flash[k] ? 'flash' : s.rain[k] ? 'rain' : null, now });
+  }
+}
+// Низ экрана «Пирс» (согласовано с Андреем 29.10, вариант В): деревянный настил над водой. На нём —
+// кассета плёнки с лентой негативов (каждый негатив — кадр колоды, лента тает с каждым добором),
+// стопка снятых полароидов (сверху — текущий кадр), из-под стопки выглядывают соседние времена со стрелками мелом,
+// под лентой — шкала направления мелом, справа — латунный жетон «Затмения».
+function panelGeom(){
+  const top = H - CFG.PANEL_H, cx = 200, cy = H - 64, vfW = CFG.VF_W;
+  return { top, cx, cy, vfW, thW: CFG.THUMB_W, prevX: cx - 82, nextX: cx + 82, thY: cy + 10,
+    can: { x: 8, y: top - 6, w: 66, h: 86 },                       // кассета стоит на краю настила
+    strip: { x: 62, y: top + 20, h: 32, fw: 26 },                  // лента: высота и шаг кадра-негатива
+    film: { x: 6, y: top - 8, w: VW - 12, h: 76 },                 // зона тапа «плёнка»: кассета и лента
+    gaugeY: top + 70, wild: { x: VW - 34, y: H - 48, r: 23 } };
+}
+// Настил: спрайт GPT по ширине экрана, дальний край — на линии top; ниже картинки тянется её нижняя строка.
+function drawDeck(Pg){
+  const im = IMG['sprite:deck'];
+  if (im){
+    const k = VW / im.width, ih = im.height * k, y0 = Pg.top - ART.DECK_EDGE * ih;
+    ctx.drawImage(im, 0, y0, VW, ih);
+    if (y0 + ih < H) ctx.drawImage(im, 0, im.height - 2, im.width, 2, 0, y0 + ih - 1, VW, H - y0 - ih + 1);
+  } else {
+    const g = ctx.createLinearGradient(0, Pg.top, 0, H); g.addColorStop(0, '#9a6a3c'); g.addColorStop(1, '#5e3a1e');
+    ctx.fillStyle = g; ctx.fillRect(0, Pg.top, VW, H - Pg.top);
+    ctx.strokeStyle = 'rgba(40,20,8,0.45)'; ctx.lineWidth = 1.5;
+    for (let i = 0; i <= 10; i++){ const xb = i * VW / 10, xt = VW / 2 + (xb - VW / 2) * 0.86; ctx.beginPath(); ctx.moveTo(xt, Pg.top); ctx.lineTo(xb, H); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(30,14,6,0.5)'; ctx.fillRect(0, Pg.top, VW, 5);
+  }
+  // мягкая тень от края настила на воде
+  const sh = ctx.createLinearGradient(0, Pg.top - 14, 0, Pg.top); sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,0,0,0.22)');
+  ctx.fillStyle = sh; ctx.fillRect(0, Pg.top - 14, VW, 14);
+}
+// Негатив на ленте: одинаковый для всех кадров колоды (порядок плёнки игрок не знает) — инвертированный тёплый снимок залива.
+let NEG_CACHE = null;
+function negative(px){
+  px = Math.max(8, Math.round(px));
+  if (NEG_CACHE && NEG_CACHE.width === px) return NEG_CACHE;
+  const c = document.createElement('canvas'); c.width = c.height = px; const x = c.getContext('2d');
+  x.drawImage(photo('noon', px), 0, 0, px, px);
+  x.globalCompositeOperation = 'difference'; x.fillStyle = '#fff'; x.fillRect(0, 0, px, px);
+  x.globalCompositeOperation = 'multiply'; x.fillStyle = '#e8904a'; x.fillRect(0, 0, px, px);
+  x.globalCompositeOperation = 'source-over'; x.fillStyle = 'rgba(40,18,6,0.35)'; x.fillRect(0, 0, px, px);
+  return (NEG_CACHE = c);
+}
+function drawPanel(now){
+  const s = G.s, Pg = panelGeom();
+  drawDeck(Pg);
+  drawFilm(now, Pg);
+  drawGauge(now, Pg);
+  // соседние времена — выглядывают из-под стопки; после ошибки подсвечиваются
+  const hp = G.hintPulse ? clamp(1 - (now - G.hintPulse) / 900, 0, 1) : 0, pul = 1 + 0.12 * hp * Math.abs(Math.sin((now - G.hintPulse) / 90));
+  const ring = hp > 0 ? 'rgba(255,214,120,' + (0.4 + 0.6 * hp).toFixed(2) + ')' : null;
+  if (s.wildTop){
+    chalkText('любой', Pg.prevX - 6, Pg.thY + 4, 14); chalkText('любой', Pg.nextX + 6, Pg.thY + 4, 14);
+  } else {
+    const V = s.V, prevId = s.ids[(s.top - 1 + V) % V], nextId = s.ids[(s.top + 1) % V];
+    drawPolaroid(ctx, Pg.prevX, Pg.thY, Pg.thW, -0.3, prevId, 1, { scale: pul, ring, shadow: 0.35 });
+    drawPolaroid(ctx, Pg.nextX, Pg.thY, Pg.thW, 0.3, nextId, 1, { scale: pul, ring, shadow: 0.35 });
+    chalkArrow(Pg.prevX - Pg.thW * 0.72, Pg.thY - 6, -1); chalkArrow(Pg.nextX + Pg.thW * 0.72, Pg.thY - 6, 1);
+  }
+  // стопка: прошлые кадры вразброс, сверху — текущий; при посадке нового — сплющивание и облачко пыли
+  G.pileHist.slice(0, 3).reverse().forEach((id, i) => {
+    const r = mulberry32(G.pileSeed + (G.pileHist.length - i) * 13), dx = (r() - 0.5) * 16, dy = (r() - 0.5) * 8, rot = (r() - 0.5) * 0.5;
+    drawPolaroid(ctx, Pg.cx + dx, Pg.cy + dy, Pg.vfW, rot, id, 1, { shadow: 0.3 });
+  });
+  const lt = G.land ? clamp((now - G.land) / (CFG.LAND_MS / G.timeScale), 0, 1) : 1, sq = lt < 1 ? Math.sin(lt * Math.PI) * (1 - lt) : 0;
+  drawPolaroid(ctx, Pg.cx, Pg.cy, Pg.vfW, -0.04, G.vfId, 1, { shadow: 0.42, sx: 1 + 0.08 * sq, sy: 1 - 0.07 * sq });
+  drawWildButton(now, Pg);
+}
+// Мел на досках: стрелка «раньше» / «позже» и подписи — белые штрихи с лёгкой дрожью.
+function chalkArrow(x, y, dir){
+  ctx.save(); ctx.strokeStyle = 'rgba(250,246,236,0.85)'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(x - dir * 2, y + 8); ctx.quadraticCurveTo(x + dir * 8, y + 10, x + dir * 18, y + 2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x + dir * 10, y - 2); ctx.lineTo(x + dir * 19, y + 2); ctx.lineTo(x + dir * 12, y + 9); ctx.stroke();
+  ctx.restore();
+}
+function chalkText(t, x, y, size){
+  ctx.save(); ctx.font = '700 ' + size + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(250,246,236,0.9)'; ctx.shadowColor = 'rgba(0,0,0,0.25)'; ctx.shadowBlur = 0; ctx.fillText(t, x, y); ctx.restore();
+}
+// Плёнка: кассета (спрайт GPT) стоит на настиле, из неё тянется лента негативов — по кадру на каждый кадр колоды.
+// Счётчик на этикетке; лента пульсирует золотом, когда на столе нет хода; новые кадры шкалы приезжают в её конец.
+function drawFilm(now, Pg){
+  const s = G.s, n = s.stock.length, noMove = !playable(s).length && n > 0, S = Pg.strip, C = Pg.can;
+  let dx = 0, bump = 1, glow = 0;
+  if (G.filmShake){ const t = (now - G.filmShake) / 320; if (t < 1) dx = Math.sin(t * 28) * 3 * (1 - t); else G.filmShake = 0; }
+  if (G.filmBump){ const t = (now - G.filmBump) / 380; if (t < 1) bump = 1 + 0.12 * Math.sin(t * Math.PI) * (1 - t * 0.5); else G.filmBump = 0; }
+  if (noMove) glow = 0.5 + 0.5 * Math.abs(Math.sin(now / 260));
+  // лента: волной по доскам; сдвиг при доборе (кадры подтягиваются к кассете)
+  const shift = G.stripShift ? clamp(1 - (now - G.stripShift) / 260, 0, 1) * S.fw : 0, shown = Math.min(n, Math.floor((VW - S.x) / S.fw) + 1);
+  if (shown > 0){
+    ctx.save(); ctx.translate(dx, 0);
+    const len = shown * S.fw + 6;
+    ctx.fillStyle = '#20150e'; ctx.beginPath();
+    for (let i = 0; i <= shown; i++){ const x = S.x + i * S.fw + shift, y = S.y + Math.sin(i * 0.7 + 1) * 2.5; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    for (let i = shown; i >= 0; i--){ const x = S.x + i * S.fw + shift, y = S.y + S.h + Math.sin(i * 0.7 + 1) * 2.5; ctx.lineTo(x, y); }
+    ctx.closePath(); ctx.fill();
+    for (let i = 0; i < shown; i++){
+      const x = S.x + i * S.fw + shift, y = S.y + Math.sin(i * 0.7 + 1.35) * 2.5, fw = S.fw - 4, ih = S.h - 12;
+      ctx.drawImage(negative(fw * scale * DPR), x + 2, y + 6, fw, ih);
+      ctx.fillStyle = 'rgba(240,226,200,0.55)';
+      for (const yy of [y + 1.5, y + S.h - 4.5]) for (let h = 0; h < 3; h++) ctx.fillRect(x + 3 + h * (fw / 3), yy, 3, 3);
+    }
+    if (glow){ ctx.strokeStyle = 'rgba(255,214,120,' + glow.toFixed(2) + ')'; ctx.lineWidth = 3; rr(ctx, S.x - 4, S.y - 6, Math.min(len, VW - S.x) + 4, S.h + 12, 10); ctx.stroke(); }
+    ctx.restore();
+  }
+  // кассета поверх начала ленты
+  ctx.save(); ctx.translate(C.x + C.w / 2 + dx, C.y + C.h / 2); ctx.scale(bump, bump); if (noMove) ctx.rotate(Math.sin(now / 130) * 0.04);
+  const sp = IMG['sprite:film'];
+  if (sp){ if (!n) ctx.globalAlpha = 0.5; ctx.drawImage(sp, 0, 0, sp.width * 0.72, sp.height, -C.h * 0.5, -C.h * 0.55, C.h * 0.72, C.h); ctx.globalAlpha = 1; }
+  else { ctx.fillStyle = '#222'; rr(ctx, -C.w / 2, -C.h / 2, C.w * 0.7, C.h, 8); ctx.fill(); ctx.fillStyle = '#f2b632'; ctx.fillRect(-C.w / 2, -10, C.w * 0.7, 22); }
+  ctx.fillStyle = n ? '#2b1a04' : '#6b6358'; ctx.font = '900 21px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(String(n), -C.h * 0.14, C.h * 0.07);
+  ctx.restore();
+}
+// Шкала направления — мелом на досках: V клеток; ход в ту же сторону кладёт в клетку мини-кадр;
+// на полкруга нарисована плёнка (кадр на плёнку), в конце — затмение («Полный день»). Разворот начинает шкалу заново.
+function drawGauge(now, Pg){
+  const s = G.s, V = s.V, half = gaugeHalf(s), sz = Math.min(14, 160 / V), gap = 4, w = V * (sz + gap) - gap, x0 = Pg.cx - w / 2, y = Pg.gaugeY - sz / 2;
+  const run = s.dirRun;
+  ctx.save(); ctx.strokeStyle = 'rgba(250,246,236,0.6)'; ctx.lineWidth = 1.6; ctx.lineJoin = 'round';
+  for (let i = 0; i < V; i++){
+    const x = x0 + i * (sz + gap), j = (i * 37) % 5 - 2;
+    if (i < run && G.runLog[i]){
+      const pt = G.pipPop[i] !== undefined ? clamp((now - G.pipPop[i]) / 260, 0, 1) : 1, ps = sz * (1 + 0.45 * Math.sin(pt * Math.PI) * (1 - pt));
+      ctx.drawImage(photo(G.runLog[i], sz * scale * DPR), x + sz / 2 - ps / 2, y + sz / 2 - ps / 2, ps, ps);
+    } else { ctx.beginPath(); ctx.moveTo(x + 0.5, y + 0.5 + j * 0.2); ctx.lineTo(x + sz, y + 0.5); ctx.lineTo(x + sz - 0.5, y + sz); ctx.lineTo(x, y + sz - 0.4); ctx.closePath(); ctx.stroke(); }
+    if ((i === half - 1 || i === V - 1) && !(i < run && G.runLog[i])){       // значок награды — в пустой клетке
+      const ic = i === V - 1 ? IMG['sprite:eclipse'] : IMG['sprite:film'], isz = sz * 0.9;
+      if (ic){ ctx.globalAlpha = 0.85; ctx.drawImage(ic, x + sz / 2 - isz / 2, y + sz / 2 - isz / 2, isz, isz); ctx.globalAlpha = 1; }
+    }
+  }
+  if (s.dir && run) chalkArrow(s.dir > 0 ? x0 + w + 4 : x0 - 4, y + sz / 2 - 6, s.dir);
+  ctx.restore();
+  if (s.streak > 1){
+    const pt = G.streakPop ? clamp((now - G.streakPop) / 240, 0, 1) : 1, k = 1 + 0.5 * (1 - pt);
+    ctx.save(); ctx.translate(x0 - 50, y + sz / 2); ctx.scale(k, k); chalkText('×' + s.streak, 0, 0, 15); ctx.restore();
+  }
+}
+// «Затмение» — латунный жетон на настиле со счётчиком; пульсирует, когда хода нет.
+function drawWildButton(now, Pg){
+  const s = G.s, B = Pg.wild; if (s.wilds <= 0 && !s.wildTop) return;
+  const can = canWild(s), urge = can && !playable(s).length, pul = urge ? 1 + 0.08 * Math.sin(now / 150) : 1;
+  ctx.save(); ctx.translate(B.x, B.y); ctx.scale(pul, pul);
+  ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(2, 5, B.r, B.r * 0.9, 0, 0, 6.2832); ctx.fill();
+  const g = ctx.createRadialGradient(-B.r * 0.3, -B.r * 0.4, 2, 0, 0, B.r); g.addColorStop(0, '#f4d58a'); g.addColorStop(0.6, '#b8862e'); g.addColorStop(1, '#6e4a14');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, B.r, 0, 6.2832); ctx.fill();
+  ctx.fillStyle = '#120c18'; ctx.beginPath(); ctx.arc(0, 0, B.r * 0.74, 0, 6.2832); ctx.fill();
+  const sp = IMG['sprite:eclipse']; ctx.rotate(now / 3000);
+  if (sp) ctx.drawImage(sp, -B.r * 0.95, -B.r * 0.95, B.r * 1.9, B.r * 1.9);
+  ctx.restore();
+  if (urge){ ctx.strokeStyle = 'rgba(255,214,120,0.9)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(B.x, B.y, B.r + 5 + 3 * Math.abs(Math.sin(now / 200)), 0, 6.2832); ctx.stroke(); }
+  if (s.wilds > 0) chalkText('×' + s.wilds, B.x, B.y - B.r - 10, 14);
+}
+// Полёт кадра: приподнялся под пальцем → дуга к стопке с поворотом и упругим ростом → шлёп на стопку.
+// Из плёнки летит первый негатив и проявляется по дороге.
+function drawFlights(now){
+  const Pg = panelGeom();
+  for (let i = G.flights.length - 1; i >= 0; i--){
+    const f = G.flights[i], lift = f.fromFilm ? 0 : CFG.LIFT_MS / G.timeScale, el = now - f.t0;
+    let x = f.x0, y = f.y0, w = f.w0, rot = f.rot0, sh = 0.35, lf = 0, dev = 1;
+    if (el < lift){ const t = el / lift; w = f.w0 * (1 + 0.15 * easeOut(t)); y -= 6 * t; lf = t; }
+    else {
+      const t = clamp((el - lift) / (f.dur - lift), 0, 1), e = easeInOut(t), b = easeOutBack(t);
+      const mx = (f.x0 + Pg.cx) / 2 + f.dir * 30, my = Math.min(f.y0, Pg.cy) - 70;
+      x = (1 - e) * (1 - e) * f.x0 + 2 * (1 - e) * e * mx + e * e * Pg.cx; y = (1 - e) * (1 - e) * (f.y0 - 6) + 2 * (1 - e) * e * my + e * e * Pg.cy;
+      w = f.w0 * 1.15 + (Pg.vfW - f.w0 * 1.15) * b; rot = f.rot0 * (1 - e) + f.dir * 0.5 * Math.sin(e * Math.PI) - 0.04 * e; lf = 1 - e; sh = 0.4;
+      if (f.fromFilm) dev = clamp(t * 1.4, 0, 1);
+      if (t >= 1){ G.pileHist.unshift(G.vfId); G.pileHist.length = Math.min(G.pileHist.length, 4); G.vfId = f.id; G.land = now; G.flights.splice(i, 1);
+        burst(Pg.cx, Pg.cy + Pg.vfW * 0.5, [250, 240, 220], 8, 0.12); continue; }
+    }
+    drawPolaroid(ctx, x, y, w, rot, f.id, dev, { shadow: sh, lift: lf, photoPx: Pg.vfW * 0.85 });
+  }
+  // кадр шкалы летит со стопки в конец ленты
+  for (let i = G.bonusFlights.length - 1; i >= 0; i--){
+    const b = G.bonusFlights[i], t = (now - b.t0) / b.dur; if (t < 0) continue;
+    const S = Pg.strip, e = easeInOut(clamp(t, 0, 1)), x0 = b.x0 !== undefined ? b.x0 : Pg.cx, y0 = b.y0 !== undefined ? b.y0 : Pg.cy - 30;
+    const x1 = Math.min(VW - 20, S.x + G.s.stock.length * S.fw - S.fw / 2), y1 = S.y + S.h / 2;
+    const x = x0 + (x1 - x0) * e, y = y0 + (y1 - y0) * e - Math.sin(e * Math.PI) * 60;
+    ctx.drawImage(negative(S.fw * scale * DPR), x - S.fw / 2, y - S.fw / 2, S.fw, S.fw);
+    if (fxRnd() < 0.6) G.parts.push({ kind: 'spark', x, y, vx: 0, vy: 0.02, g: 0, t0: now, life: 380, size: 2, col: [255, 214, 120] });
+    if (t >= 1){ G.bonusFlights.splice(i, 1); G.filmBump = now; floatText('+1 кадр', x1, S.y - 10); burst(x1, y1, [255, 214, 120], 10, 0.18); }
+  }
+}
+function drawParts(now){
+  for (let i = G.parts.length - 1; i >= 0; i--){
+    const p = G.parts[i], t = now - p.t0; if (t < 0) continue;
+    if (t > p.life){ G.parts.splice(i, 1); continue; }
+    const x = p.x + p.vx * t, y = p.y + p.vy * t + 0.5 * p.g * t * t, a = 1 - t / p.life;
+    if (p.kind === 'spark'){ ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = rgba(p.col, 0.9 * a); ctx.beginPath(); ctx.arc(x, y, p.size * (0.5 + a * 0.5), 0, 6.2832); ctx.fill(); ctx.restore(); }
+    else drawPolaroid(ctx, x, y, p.size, p.rot + p.vr * t, p.id, 1, { shadow: 0.2 });
+  }
+  for (let i = G.floats.length - 1; i >= 0; i--){
+    const f = G.floats[i], t = (now - f.t0) / f.dur; if (t >= 1){ G.floats.splice(i, 1); continue; }
+    ctx.save(); ctx.globalAlpha = t < 0.7 ? 1 : (1 - t) / 0.3; ctx.translate(f.x, f.y - 26 * easeOut(t)); const k = 1 + 0.3 * (1 - clamp(t * 4, 0, 1)); ctx.scale(k, k);
+    ctx.font = '900 15px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(20,10,30,0.6)';
+    ctx.strokeText(f.text, 0, 0); ctx.fillStyle = f.col; ctx.fillText(f.text, 0, 0); ctx.restore();
+  }
+}
+// Подсказка-рука: в уроке — на нужный кадр или плёнку; на обычных уровнях — после долгого бездействия.
+function hintTarget(now){
+  const s = G.s; if (G.ending || G.screen !== 'game' || G.flights.length) return null;
+  const pl = playable(s), tgt = pl.length ? pl[0] : s.stock.length ? 'film' : canWild(s) ? 'wild' : null; if (tgt === null) return null;
+  if ((LEVELS[s.li] || {}).tutorial){
+    const idle = now - Math.max(G.lastAct, G.lastInput) > CFG.TUT_HINT_MS, err = G.errAt && now - G.errAt < 1500;
+    if (s.moves === 0 || idle || err || (tgt === 'film' && now - G.lastAct > 900)) return tgt;
+    return null;
+  }
+  if (now - Math.max(G.lastAct, G.lastInput) > CFG.IDLE_HINT_MS) return pl.length ? greedyPick(s, pl, () => 0.5) : tgt;
+  return null;
+}
+function drawHint(now){
+  const tgt = hintTarget(now); if (tgt === null) return;
+  let x, y; const Pg = panelGeom();
+  if (tgt === 'film'){ x = Pg.strip.x + Pg.strip.fw * 0.6; y = Pg.strip.y + Pg.strip.h / 2; }
+  else if (tgt === 'wild'){ x = Pg.wild.x; y = Pg.wild.y; }
+  else { const T = tileGeom(tgt); x = T.x; y = T.y; }
+  // нажатие: рука подъезжает к цели и «жмёт» (сжимается), в момент касания расходится кольцо
+  const ph = (now % 1200) / 1200, press = ph < 0.35 ? easeInOut(ph / 0.35) : ph < 0.5 ? 1 : 1 - easeInOut((ph - 0.5) / 0.5);
+  if (ph > 0.35 && ph < 0.95){ const rt = (ph - 0.35) / 0.6; ctx.strokeStyle = 'rgba(255,255,255,' + (0.9 * (1 - rt)).toFixed(2) + ')'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, 10 + rt * 22, 0, 6.2832); ctx.stroke(); }
+  const sp = IMG['sprite:hand'], sz = 64, off = 14 * (1 - press);
+  ctx.save(); ctx.translate(x + off, y + off); ctx.scale(1 - 0.06 * press, 1 - 0.06 * press);
+  if (sp) ctx.drawImage(sp, -sz * ART.HAND_TIP[0], -sz * ART.HAND_TIP[1], sz, sz);
+  else { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, 0, 8, 0, 6.2832); ctx.fill(); }
+  ctx.restore();
+}
+function drawFx(now){
+  if (G.flash){ const t = (now - G.flash) / (CFG.FLASH_MS / G.timeScale); if (t < 1){ ctx.fillStyle = 'rgba(255,255,255,' + (0.8 * (1 - t)).toFixed(3) + ')'; ctx.fillRect(0, 0, W, H); } else G.flash = 0; }
+  if (G.banner){
+    const t = (now - G.banner.t0) / (CFG.BANNER_MS / G.timeScale);
+    if (t >= 1) G.banner = null;
+    else if (t >= 0){
+      const a = t < 0.15 ? t / 0.15 : t > 0.8 ? (1 - t) / 0.2 : 1, sc = 0.7 + 0.3 * easeOutBack(clamp(t / 0.25, 0, 1));
+      ctx.save(); ctx.translate(W / 2, horizonY() * 0.62); ctx.scale(sc, sc); ctx.globalAlpha = a;
+      ctx.font = '900 40px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.lineWidth = 7; ctx.strokeStyle = 'rgba(20,10,30,0.55)'; ctx.strokeText(G.banner.text, 0, 0);
+      ctx.fillStyle = '#fff6d8'; ctx.fillText(G.banner.text, 0, 0);
+      if (G.banner.sub){ ctx.font = '800 20px system-ui, sans-serif'; ctx.lineWidth = 5; ctx.strokeText(G.banner.sub, 0, 34); ctx.fillStyle = '#ffd27a'; ctx.fillText(G.banner.sub, 0, 34); }
+      ctx.restore();
+    }
+  }
+}
+// Контактный лист для проверки палитры: все 10 времён по кругу — крупно (72) и размером кадра на столе (36).
+function drawSheet(){
+  ctx.fillStyle = '#1a1b22'; ctx.fillRect(0, 0, W, H);
+  const ids = SCALES[10]; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = '#fff'; ctx.font = '600 11px system-ui, sans-serif';
+  ids.forEach((id, i) => {
+    const x = 40 + (i % 5) * 80, y = 30 + Math.floor(i / 5) * 120;
+    drawPolaroid(ctx, x, y + 50, 72, 0, id, 1, {}); ctx.fillText(TIME_NAMES[id], x, y + 98);
+  });
+  ['8', '10'].forEach((k, r) => SCALES[k].forEach((id, i) => {
+    const n = SCALES[k].length, pitch = Math.min(38, (VW - 20) / n), x = (VW - n * pitch) / 2 + (i + 0.5) * pitch;
+    drawPolaroid(ctx, x, 300 + r * 70, pitch - 2.5, 0, id, 1, {});
+  }));
+  const veils = [['cloud', 0], ['lantern', 0], ['lantern', 1]];
+  veils.forEach(([kind, lit], i) => drawPolaroid(ctx, 80 + i * 120, 470, 72, 0, 'noon', 1, { veil: { kind, a: 1, t: 0, lit } }));
+}
+
+// Галерея форм для проверки глазом: список уровней — сетка 3 колонки, в каждой ячейке форма уровня (белые — открытые, тёмные — закрытые).
+function drawGallery(list){
+  ctx.fillStyle = '#1a1b22'; ctx.fillRect(0, 0, W, H);
+  const cols = 3, cw = W / cols, ch = Math.min(170, (H - 20) / Math.ceil(list.length / cols));
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.font = '600 11px system-ui, sans-serif';
+  list.forEach((li, idx) => {
+    const L = buildLayout(levelSpec(li, G.save.mode).layout), cx = (idx % cols) * cw, cy = 10 + Math.floor(idx / cols) * ch;
+    const pitch = Math.min((cw - 12) / L.width, (ch - 30) / (CFG.POLA_RATIO * (1 + L.height * CFG.ROW_STEP))), tw = pitch * 0.92, th = tw * CFG.POLA_RATIO;
+    const x0 = cx + (cw - L.width * pitch) / 2, y0 = cy + 16;
+    for (const k of L.order){ const x = x0 + (L.x[k] + 0.5) * pitch, y = y0 + L.y[k] * th * CFG.ROW_STEP + th / 2;
+      ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(x - tw / 2 + 1, y - th / 2 + 1.5, tw, th);
+      ctx.fillStyle = L.initCover[k] ? '#5a5248' : '#fbf8f0'; ctx.fillRect(x - tw / 2, y - th / 2, tw, th);
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 0.6; ctx.strokeRect(x - tw / 2, y - th / 2, tw, th); }
+    ctx.fillStyle = '#fff'; ctx.fillText((li + 1) + ' · ' + L.title + ' · ' + L.n, cx + cw / 2, cy);
+  });
+}
+
+// --- цикл: rAF + watchdog setInterval; безопасно, потому что время абсолютное (§4). Кадр под try/catch. ---
+let lastFrame = 0, lastErr = 0;
+function safeRender(){ try { render(); } catch (e) { const n = nowMs(); if (n - lastErr > 1000){ lastErr = n; log('event', 'error', e && e.stack ? e.stack.split('\n').slice(0, 2).join(' | ') : e); } } }
+function frame(){ lastFrame = nowMs(); if (!G.paused) safeRender(); requestAnimationFrame(frame); }
+setInterval(() => { if (nowMs() - lastFrame > 120 && !G.paused) safeRender(); }, 40);
+
+// --- дебаг-хук (§6) ---
+window.GOLDEN = {
+  G, CFG, LEVELS, IMG,
+  state(){
+    const s = G.s; if (!s) return { screen: G.screen, mode: G.save.mode };
+    return { screen: G.screen, level: s.li + 1, mode: G.save.mode, V: s.V, top: s.wildTop ? 'eclipse' : s.ids[s.top], vf: G.vfId, film: s.stock.length, left: s.left,
+      playable: playable(s), open: exposed(s).map(k => k + ':' + s.ids[s.tab[k]] + (s.veil[k] ? '/' + s.veil[k] : '')), streak: s.streak, dirRun: s.dirRun, dir: s.dir,
+      wilds: s.wilds, fullDays: s.fullDays, gaugeFrames: s.gaugeFrames, win: isWin(s), stuck: isStuck(s), canExtra: canExtra(s), lose: isLose(s), ending: G.ending && G.ending.screen,
+      art: Object.keys(IMG).length };
+  },
+  play(n){ startLevel(clamp((n || 1) - 1, 0, 99999)); return this.state(); },
+  tap(k){ G.lastInput = nowMs(); tapTile(k); return this.state(); },
+  draw(){ G.lastInput = nowMs(); tapFilm(); return this.state(); },
+  wild(){ G.lastInput = nowMs(); tapWild(); return this.state(); },
+  extra(){ takeExtra(); return this.state(); },
+  goto(screen){ goto(screen); return G.screen; },
+  mode(m){ G.save.mode = m === 10 ? 10 : 8; save(); if (G.s) startLevel(G.s.li); return G.save.mode; },
+  solve(){ return G.s ? solve(G.s) : null; },
+  step(){                                       // один ход жадного бота
+    const s = G.s; if (!s || G.screen !== 'game') return null;
+    const act = botPick(s, 'greedy', mulberry32(s.moves + 1));
+    if (G.lv) G.lv.bot = true;
+    if (act === 'draw') tapFilm(); else if (act === 'wild') tapWild(); else if (act !== null) tapTile(act);
+    return act;
+  },
+  auto(delayMs){                                // жадный бот играет уровень; на «Почти!» берёт +3
+    const d = delayMs || 450; clearInterval(this._auto);
+    this._auto = setInterval(() => {
+      if (G.screen === 'extra') return takeExtra();
+      if (G.screen !== 'game' || G.ending){ if (G.screen !== 'game') clearInterval(this._auto); return; }
+      if (G.flights.length) return;
+      if (this.step() === null) clearInterval(this._auto);
+    }, d);
+    return 'auto ' + d + ' мс';
+  },
+  stop(){ clearInterval(this._auto); return 'stopped'; },
+  drive(sec){                                   // ручной прогон времени: rAF заморожен в скрытой вкладке
+    const end = nowMs() + sec * 1000; let n = 0;
+    while (nowMs() < end && n < 100000){ safeRender(); n++; }
+    return this.state();
+  },
+  speed(x){ G.timeScale = x || 1; return G.timeScale; },
+  metrics(){ return G.save.metrics; },
+  light(id){ lightTo(id, 0); Snd.setTime(id); return id; },   // посмотреть время суток без хода
+  sheet(on){ G.sheet = on !== false; return G.sheet; },       // контактный лист всех времён и завес
+  gallery(list){ G.gallery = list === false ? null : (list || [...Array(12).keys()]).map(n => n - 1); return G.gallery; },   // формы уровней (номера с 1)
+  reset(){ try { localStorage.removeItem(SAVE_KEY); } catch (e) {} location.reload(); },
+};
+
+// --- старт ---
+loadArt(); fit(); hud();
+lightTo(G.vfId, 0, true);
+const startHash = location.hash.slice(1);
+const startLvl = /^lvl(\d+)$/.exec(startHash);
+if (startLvl) startLevel(Math.max(0, +startLvl[1] - 1)); else if (startHash === 'game') startLevel(G.save.level); else goto(startHash || 'menu');
+requestAnimationFrame(frame);
+log('event', 'boot', 'levels=' + LEVELS.length + ' mode=' + G.save.mode);
+</script>
+</body>
+</html>
